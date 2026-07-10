@@ -202,6 +202,7 @@ async function loadPacks() {
   renderCategories();
   renderList();
   updateModelInfo();
+  autoPlayDefault(); // si ya había un modelo cargado, arranca solo
 }
 
 function visibleItems() {
@@ -334,7 +335,18 @@ function registerModel(root, animations, name) {
     toast('Este modelo no tiene esqueleto (rig). Puedes riggearlo automáticamente con Meshy y volver a subirlo.', true);
     setStatus('Modelo sin esqueleto: solo visualización.');
   } else {
-    setStatus(`Modelo «${name}» listo · ${skin.skeleton.bones.length} huesos. Elige una animación →`);
+    setStatus(`Modelo «${name}» listo · ${skin.skeleton.bones.length} huesos. Animando automáticamente…`);
+    autoPlayDefault();
+  }
+}
+
+// Al cargar un modelo, arranca solo con una animación neutra (idle o caminar)
+function autoPlayDefault() {
+  if (!state.model?.skin || !state.packsReady || state.currentAction) return;
+  const candidates = [/^idle loop$/i, /standing idle/i, /^idle$/i, /idle loop/i, /idle/i, /walk loop/i, /walk/i];
+  for (const re of candidates) {
+    const item = state.catalog.find((i) => i.source === 'pack' && re.test(i.pretty));
+    if (item) { playItem(item); return; }
   }
 }
 
@@ -369,7 +381,8 @@ function updateModelInfo() {
 // ---------------------------------------------------------------------------
 // Reproducción con retargeting
 // ---------------------------------------------------------------------------
-function playItem(item) {
+function playItem(item, fromDemo = false) {
+  if (!fromDemo) setDemo(false); // una elección manual apaga la demo automática
   if (!state.model) { toast('Primero carga un modelo (o usa el ejemplo).'); return; }
   const { skin, mixer } = state.model;
 
@@ -416,7 +429,23 @@ function playItem(item) {
   renderList();
 }
 
+// Demo automática: rota animaciones del paquete cada pocos segundos
+let demoTimer = null;
+function setDemo(on) {
+  if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+  document.getElementById('btn-demo').classList.toggle('primary', on);
+  if (!on) return;
+  const next = () => {
+    if (!state.model?.skin) return;
+    const items = state.catalog.filter((i) => i.source === 'pack');
+    if (items.length) playItem(items[Math.floor(Math.random() * items.length)], true);
+  };
+  next();
+  demoTimer = setInterval(next, 5000);
+}
+
 function stopAll() {
+  setDemo(false);
   if (state.currentAction) state.currentAction.fadeOut(0.2);
   setTimeout(() => {
     state.model?.mixer.stopAllAction();
@@ -541,6 +570,7 @@ document.getElementById('btn-random').onclick = () => {
   playItem(items[Math.floor(Math.random() * items.length)]);
 };
 document.getElementById('btn-stop').onclick = stopAll;
+document.getElementById('btn-demo').onclick = () => setDemo(!demoTimer);
 
 const speedEl = document.getElementById('speed');
 speedEl.oninput = () => {
