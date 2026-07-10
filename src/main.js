@@ -7,6 +7,7 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { retargetClipAuto, findBestSkinnedMesh, collectBones, buildBoneMap, captureBindPose, applyBindPose } from './retarget.js';
+import { autoRig } from './autorig.js';
 import { PACKS, categorize, prettyName } from './packs.js';
 import { PROJECTS_HTML } from './projects.js';
 
@@ -300,10 +301,25 @@ function registerModel(root, animations, name) {
   });
   scene.add(root);
 
-  const skin = findBestSkinnedMesh(root);
+  let skin = findBestSkinnedMesh(root);
+  let autoRigged = false;
+
+  // Sin esqueleto: intentamos generarle uno automáticamente (auto-rigging)
+  if (!skin) {
+    try {
+      setStatus('El modelo no tiene esqueleto: generando huesos y pesos automáticamente…', true);
+      const rig = autoRig(root);
+      skin = rig.skin;
+      autoRigged = true;
+      toast(`Esqueleto generado automáticamente: ${rig.boneCount} huesos para ${rig.vertexCount.toLocaleString()} vértices.`);
+    } catch (e) {
+      console.warn('Auto-rig falló:', e);
+    }
+  }
+
   const mixer = new THREE.AnimationMixer(root);
   state.model = {
-    root, skin, mixer, name,
+    root, skin, mixer, name, autoRigged,
     uid: ++state.modelUid,
     ownClips: animations || [],
     bindPose: skin ? captureBindPose(root) : null,
@@ -332,10 +348,10 @@ function registerModel(root, animations, name) {
   updateModelInfo();
 
   if (!skin) {
-    toast('Este modelo no tiene esqueleto (rig). Puedes riggearlo automáticamente con Meshy y volver a subirlo.', true);
+    toast('No se pudo generar un esqueleto para este modelo (¿es humanoide de pie?). También puedes riggearlo con Meshy y volver a subirlo.', true);
     setStatus('Modelo sin esqueleto: solo visualización.');
   } else {
-    setStatus(`Modelo «${name}» listo · ${skin.skeleton.bones.length} huesos. Animando automáticamente…`);
+    setStatus(`Modelo «${name}» listo · ${skin.skeleton.bones.length} huesos${autoRigged ? ' (rig generado automáticamente)' : ''}. Animando…`);
     autoPlayDefault();
   }
 }
@@ -373,7 +389,7 @@ function updateModelInfo() {
   }
   el.innerHTML = `
     <div><b>${name}</b></div>
-    <div>Esqueleto: <b>${skin ? `${skin.skeleton.bones.length} huesos` : 'no tiene ✗'}</b></div>
+    <div>Esqueleto: <b>${skin ? `${skin.skeleton.bones.length} huesos${state.model.autoRigged ? ' · auto-rig ✨' : ''}` : 'no tiene ✗'}</b></div>
     <div>Altura: <b>${h.toFixed(2)} u</b></div>
     ${mappingHtml}`;
 }

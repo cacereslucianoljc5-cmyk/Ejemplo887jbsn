@@ -14,7 +14,7 @@ const SYNONYMS = {
   hips: ['hips', 'hip', 'pelvis', 'cog'],
   spine: [], // la cadena de columna se resuelve aparte (spine/chest/upperchest)
   neck: ['neck', 'neck1', 'neck2'],
-  head: ['head'],
+  head: ['head', 'head1'],
   shoulder: ['shoulder', 'clavicle', 'collar', 'collarbone', 'scapula'],
   upperarm: ['upperarm', 'arm', 'uparm', 'bicep', 'upperarm1'],
   lowerarm: ['lowerarm', 'forearm', 'forearm1', 'elbow'],
@@ -22,12 +22,12 @@ const SYNONYMS = {
   upperleg: ['upperleg', 'upleg', 'thigh', 'hipjoint'],
   lowerleg: ['lowerleg', 'calf', 'shin', 'knee', 'leg1'],
   foot: ['foot', 'ankle'],
-  toes: ['toes', 'toe', 'toebase', 'ball'],
+  toes: ['toes', 'toe', 'toebase', 'ball', 'toe0', 'toe1'],
 };
 
 const SPINE_WORDS = ['spine', 'spine1', 'spine2', 'spine3', 'spine4', 'chest', 'upperchest', 'torso', 'waist', 'abdomen', 'stomach', 'ribcage'];
 const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'];
-const SKIP_RE = /(^|[^a-z])(ik|ctrl|control|pole|target|twist|roll|helper|attach|slot|weapon|prop|end|tip|top|null|offset|aim|look|eye|jaw|tongue|breast|ear|hair|cloth|skirt|tail|wing)([^a-z]|$)/;
+const SKIP_RE = /(^|[^a-z])(ik|ctrl|control|pole|target|twist|roll|helper|attach|slot|weapon|prop|end|tip|top|null|offset|aim|look|eye|jaw|tongue|breast|ear|hair|cloth|skirt|tail|wing|pin\d*|lips?|teeth|tooth|jiggle|phys\d*|forward|trigger)([^a-z]|$)/;
 
 // Normaliza y separa el lado (L/R) del nombre de un hueso
 export function parseBoneName(rawName) {
@@ -35,8 +35,8 @@ export function parseBoneName(rawName) {
   // quita espacios de nombre tipo "mixamorig:Hips", "Armature|Hips"
   n = n.substring(n.lastIndexOf(':') + 1);
   n = n.substring(n.lastIndexOf('|') + 1);
-  // prefijos comunes de rigs
-  n = n.replace(/^(mixamorig|def[-_.]?|cc_base_|bip\d*[-_.]?|b[-_]|j_bip_[a-z]_|hu_)/i, '');
+  // prefijos comunes de rigs (Mixamo, Rigify, Character Creator, ValveBiped/Source, VRoid…)
+  n = n.replace(/^(valvebiped\.?bip\d*[_.]?|mixamorig|def[-_.]?|cc_base_|bip\d*[-_.]?|b[-_]|j_bip_[a-z]_|hu_)/i, '');
 
   let side = '';
   const tests = [
@@ -344,16 +344,27 @@ export function retargetClipAuto(targetSkin, sourceRoot, clip, opts = {}) {
   sceneRoot.updateMatrixWorld(true);
   sourceRoot.updateMatrixWorld(true);
 
-  // escala de traslación de cadera: altura de cadera destino / origen
+  // escala de traslación de cadera: altura de cadera destino / origen.
+  // Además, offset reposo-a-reposo para que la cadera del destino quede en SU
+  // posición de descanso (modelos cuyo suelo no está en y=0 flotaban o se hundían).
   const tHips = tSlots.get('hips');
   const sHips = sSlots.get('hips');
   let scale = 1;
+  let hipPosition;
   if (tHips && sHips) {
     const tFeet = lowestY(targetBones);
     const sFeet = lowestY(sourceBones);
-    const tH = worldPos(tHips).y - tFeet;
-    const sH = worldPos(sHips).y - sFeet;
+    const tPos = worldPos(tHips);
+    const sPos = worldPos(sHips);
+    const tH = tPos.y - tFeet;
+    const sH = sPos.y - sFeet;
     if (tH > 1e-6 && sH > 1e-6) scale = tH / sH;
+    // en reposo: cadera_destino = cadera_origen*escala + offset  =>  offset/escala:
+    hipPosition = new THREE.Vector3(
+      tPos.x / scale - sPos.x,
+      tPos.y / scale - sPos.y,
+      tPos.z / scale - sPos.z,
+    );
   }
 
   // offsets de reposo: inv(rot_reposo_origen) * rot_reposo_destino por hueso
@@ -388,6 +399,7 @@ export function retargetClipAuto(targetSkin, sourceRoot, clip, opts = {}) {
     hip: sHips ? sHips.name : 'Hips',
     scale,
     hipInfluence,
+    hipPosition,
     localOffsets,
     preserveBonePositions: true,
     preserveBoneMatrix: true,

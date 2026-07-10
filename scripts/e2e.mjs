@@ -15,11 +15,8 @@ page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
 await page.goto('http://localhost:4173/', { waitUntil: 'domcontentloaded' });
 
-// espera a que carguen los packs y el modelo de ejemplo
-await page.waitForFunction(() => {
-  const s = document.getElementById('status')?.textContent || '';
-  return /Modelo .* listo/.test(s);
-}, { timeout: 90000 });
+// espera a que carguen los packs, el modelo de ejemplo y su auto-animación
+await page.waitForFunction(() => document.querySelector('.anim-item.playing'), { timeout: 90000 });
 
 const status0 = await page.textContent('#status');
 console.log('STATUS tras carga:', status0);
