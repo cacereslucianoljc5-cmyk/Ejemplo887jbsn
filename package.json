@@ -1,0 +1,19 @@
+{
+  "name": "animator-glb",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Visualizador interactivo que aplica automáticamente un paquete grande de animaciones a cualquier modelo GLB humanoide (retargeting automático de esqueleto)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.182.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1",
+    "vite": "^7.1.5"
+  }
+}
