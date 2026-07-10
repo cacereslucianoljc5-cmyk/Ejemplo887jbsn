@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#05070d" />
+<title>Stock Machine — The Machine Never Sleeps</title>
+<meta name="description" content="Stock Machine — a machine built to never stop accumulating tokenized assets. The future of finance is on-chain." />
+<style>
+  :root{
+    --bg:#05070d;
+    --ink:#f3f7ff;
+    --ink-soft:#c3ccdd;
+    --ink-dim:#8b93a7;
+    --neon:#5fe9ff;          /* soft cyan accent */
+    --neon-2:#54ffc4;        /* soft mint accent, used sparingly */
+    --line:rgba(120,200,255,.16);
+    --card:rgba(12,18,30,.55);
+    --glow: 0 0 18px rgba(95,233,255,.35);
+    --maxw:1080px;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.65;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- Rotating video background ---------- */
+  .bg-stage{
+    position:fixed;
+    inset:0;
+    z-index:-2;
+    background:#05070d;
+  }
+  .bg-stage video{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    opacity:0;
+    transition:opacity 2.2s ease-in-out;
+    will-change:opacity;
+    pointer-events:none;
+  }
+  .bg-stage video.is-active{opacity:1}
+
+  /* readability scrim: text must dominate the video */
+  .bg-scrim{
+    position:fixed;
+    inset:0;
+    z-index:-1;
+    pointer-events:none;
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(5,7,13,.35) 0%, rgba(5,7,13,.72) 55%, rgba(5,7,13,.92) 100%),
+      linear-gradient(180deg, rgba(5,7,13,.55) 0%, rgba(5,7,13,.62) 100%);
+  }
+
+  /* ---------- Layout ---------- */
+  main{position:relative;z-index:1}
+  section{
+    max-width:var(--maxw);
+    margin:0 auto;
+    padding:96px 24px;
+  }
+  .center{text-align:center}
+
+  /* ---------- Typography ---------- */
+  h1,h2,h3{line-height:1.1;letter-spacing:.01em;font-weight:800}
+  .kicker{
+    font-size:clamp(.72rem,1.4vw,.85rem);
+    letter-spacing:.42em;
+    text-transform:uppercase;
+    color:var(--neon);
+    font-weight:700;
+    text-shadow:0 0 12px rgba(95,233,255,.45);
+  }
+  h1{
+    font-size:clamp(2.8rem,9vw,6rem);
+    letter-spacing:.06em;
+    margin:.35em 0;
+    text-shadow:0 0 22px rgba(95,233,255,.28), 0 0 2px rgba(255,255,255,.4);
+  }
+  h2{
+    font-size:clamp(1.9rem,5vw,3rem);
+    margin-bottom:.35em;
+    text-shadow:0 0 18px rgba(95,233,255,.22);
+  }
+  h3{font-size:clamp(1.15rem,2.6vw,1.5rem);margin-bottom:.4em}
+  p{color:var(--ink-soft);font-size:clamp(1.02rem,2vw,1.18rem);margin:0 auto}
+  .lead p{max-width:56ch}
+  .muted{color:var(--ink-dim)}
+  .accent{color:var(--neon)}
+  .accent-2{color:var(--neon-2)}
+
+  .stack > *{margin-top:1.05em}
+  .stack > *:first-child{margin-top:0}
+
+  /* soft divider */
+  .rule{
+    width:min(680px,90%);
+    height:1px;
+    margin:0 auto;
+    background:linear-gradient(90deg,transparent,var(--line),transparent);
+  }
+
+  /* ---------- Hero ---------- */
+  .hero{
+    min-height:100svh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding-top:120px;
+    padding-bottom:80px;
+  }
+  .hero .tagline{
+    font-size:clamp(1.15rem,3vw,1.7rem);
+    color:var(--ink);
+    font-weight:500;
+    max-width:22ch;
+    margin:1.2em auto 0;
+  }
+  .hero .tagline strong{color:var(--neon-2);font-weight:700}
+
+  /* letter reveal (soft, no glitch) */
+  .reveal-letters .word{display:inline-block;white-space:nowrap}
+  .reveal-letters .ltr{
+    display:inline-block;
+    opacity:0;
+    transform:translateY(.35em);
+    animation:letterIn .7s cubic-bezier(.2,.7,.2,1) forwards;
+  }
+  @keyframes letterIn{to{opacity:1;transform:translateY(0)}}
+
+  /* gentle floating pulse on the accent underline */
+  .scroll-hint{
+    margin-top:52px;
+    color:var(--ink-dim);
+    font-size:.8rem;
+    letter-spacing:.25em;
+    text-transform:uppercase;
+    animation:floaty 2.8s ease-in-out infinite;
+  }
+  @keyframes floaty{0%,100%{transform:translateY(0);opacity:.55}50%{transform:translateY(7px);opacity:1}}
+
+  /* ---------- Scroll reveal ---------- */
+  .fx{opacity:0;transform:translateY(26px);transition:opacity .9s ease,transform .9s ease}
+  .fx.in{opacity:1;transform:none}
+
+  /* ---------- Cards / grids ---------- */
+  .grid{
+    display:grid;
+    gap:18px;
+    grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+    margin-top:40px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:26px 24px;
+    backdrop-filter:blur(6px);
+    transition:transform .4s ease,border-color .4s ease,box-shadow .4s ease;
+  }
+  .card:hover{
+    transform:translateY(-4px);
+    border-color:rgba(95,233,255,.4);
+    box-shadow:var(--glow);
+  }
+  .card .ic{font-size:1.9rem;display:block;margin-bottom:12px}
+  .card h3{color:var(--ink)}
+  .card p{font-size:1rem;color:var(--ink-soft)}
+
+  /* ---------- Milestones timeline ---------- */
+  .timeline{
+    margin:44px auto 0;
+    max-width:640px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .ms{
+    display:flex;
+    align-items:center;
+    gap:18px;
+    padding:16px 22px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:var(--card);
+    backdrop-filter:blur(6px);
+    text-align:left;
+  }
+  .ms .cap{
+    font-weight:800;
+    color:var(--neon);
+    min-width:88px;
+    font-variant-numeric:tabular-nums;
+    text-shadow:0 0 10px rgba(95,233,255,.35);
+  }
+  .ms .desc{color:var(--ink-soft);font-size:1rem}
+
+  /* emphasis lines list */
+  .lines{list-style:none;display:flex;flex-direction:column;gap:.5em;margin-top:.4em}
+  .lines li{color:var(--ink-soft)}
+  .lines li::before{content:"›";color:var(--neon);margin-right:.6em;font-weight:700}
+
+  /* ---------- CTA ---------- */
+  .cta{
+    display:inline-block;
+    margin-top:34px;
+    padding:16px 42px;
+    border-radius:999px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:#04141a;
+    text-decoration:none;
+    background:linear-gradient(90deg,var(--neon),var(--neon-2));
+    box-shadow:0 0 24px rgba(95,233,255,.35);
+    transition:transform .3s ease,box-shadow .3s ease;
+  }
+  .cta:hover{transform:translateY(-2px);box-shadow:0 0 34px rgba(95,233,255,.55)}
+
+  .final .big{
+    display:flex;flex-wrap:wrap;justify-content:center;gap:.4em 1.1em;
+    font-weight:800;font-size:clamp(1.2rem,3.2vw,1.7rem);margin-top:1.2em;
+  }
+  .final .big span{color:var(--ink)}
+  .final .big .a{color:var(--neon)}
+
+  footer{
+    text-align:center;
+    padding:40px 24px 60px;
+    color:var(--ink-dim);
+    font-size:.85rem;
+    position:relative;z-index:1;
+  }
+
+  @media (max-width:560px){
+    section{padding:72px 20px}
+    .ms{flex-direction:column;align-items:flex-start;gap:6px}
+    .ms .cap{min-width:0}
+    h1{font-size:clamp(2.1rem,10.5vw,3.2rem);letter-spacing:.02em}
+    .reveal-letters{word-spacing:.1em}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important}
+    .fx{opacity:1;transform:none;transition:none}
+    .bg-stage video{transition:opacity .4s linear}
+  }
+</style>
+</head>
+<body>
+
+<!-- Rotating video backgrounds -->
+<div class="bg-stage" aria-hidden="true">
+  <video id="bgA" class="is-active" src="assets/bg-digital.mp4"
+         autoplay muted loop playsinline preload="auto"
+         disablepictureinpicture></video>
+  <video id="bgB" src="assets/bg-finance.mp4"
+         autoplay muted loop playsinline preload="auto"
+         disablepictureinpicture></video>
+</div>
+<div class="bg-scrim" aria-hidden="true"></div>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+    <p class="kicker">The Future Is On-Chain</p>
+    <h1 class="reveal-letters" data-text="STOCK MACHINE">STOCK MACHINE</h1>
+    <p class="tagline">
+      You weren't born to work for money.<br>
+      <strong>Money should work for you.</strong>
+    </p>
+    <p class="scroll-hint">Scroll</p>
+  </section>
+
+  <div class="rule"></div>
+
+  <!-- INTRO -->
+  <section class="center lead stack fx">
+    <p>Millions of people spend countless hours searching for the next winning stock. The next Tesla. The next Nvidia. The next big opportunity.</p>
+    <p>Stock Machine was built around a different idea — <span class="accent">build a machine that never stops accumulating assets.</span></p>
+    <ul class="lines" style="max-width:52ch;margin:0 auto;text-align:left">
+      <li>While others chase opportunities, the Machine accumulates them.</li>
+      <li>While others try to predict the market, the Machine keeps buying.</li>
+      <li>While others wait for the next boom, the Machine keeps growing.</li>
+    </ul>
+    <p class="muted">Every new holder strengthens the ecosystem. Every milestone adds fuel. Every cycle expands the vault.</p>
+  </section>
+
+  <div class="rule"></div>
+
+  <!-- BLOCKCHAIN -->
+  <section class="stack fx">
+    <p class="kicker center">Why Blockchain Changes Everything</p>
+    <h2 class="center">Access, unlocked.</h2>
+    <div class="lead stack center">
+      <p>For decades, access to financial assets has been controlled by brokers, banks, paperwork, restrictions, and outdated systems. Blockchain changes the game.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><span class="ic">⚡</span><h3>Instant &amp; Global</h3><p>Tokenized assets can move globally in seconds — transparent, verifiable, borderless.</p></div>
+      <div class="card"><span class="ic">🕒</span><h3>Available 24/7</h3><p>No waiting for business hours. No unnecessary intermediaries. No geographical barriers.</p></div>
+      <div class="card"><span class="ic">🔎</span><h3>Verifiable On-Chain</h3><p>Every distribution can be verified. Every milestone tracked publicly, in real time.</p></div>
+    </div>
+    <p class="center muted" style="margin-top:34px;max-width:60ch">
+      This isn't about creating value from nothing. It's about using blockchain to connect a growing community with real-world assets through an automated system designed to run continuously. The future of finance isn't locked behind bank doors — <span class="accent">it's running on-chain.</span>
+    </p>
+  </section>
+
+  <div class="rule"></div>
+
+  <!-- HOW IT WORKS -->
+  <section class="stack fx">
+    <p class="kicker center">⚙️ How The Machine Works</p>
+    <h2 class="center">Built to run without stopping.</h2>
+    <div class="grid">
+      <div class="card"><span class="ic">🔓</span><h3>$10,000 Market Cap</h3><p>The Machine unlocks its first real tokenized stock.</p></div>
+      <div class="card"><span class="ic">🚀</span><h3>Every +$20,000 MC</h3><p>A new tokenized stock is added to the vault.</p></div>
+      <div class="card"><span class="ic">💸</span><h3>75% Instant Drop</h3><p>Whenever a new stock is unlocked, 75% is instantly distributed to qualified holders.</p></div>
+      <div class="card"><span class="ic">📦</span><h3>Direct To Wallet</h3><p>No staking. No locking. No claiming. No extra steps. Assets arrive directly in your wallet.</p></div>
+      <div class="card"><span class="ic">🔄</span><h3>Every 5 Minutes</h3><p>The Machine uses the accumulated treasury to acquire more tokenized stocks and distribute them automatically.</p></div>
+    </div>
+  </section>
+
+  <div class="rule"></div>
+
+  <!-- MILESTONES -->
+  <section class="stack fx">
+    <p class="kicker center">🎯 Milestones</p>
+    <h2 class="center">Every milestone expands the vault.</h2>
+    <div class="timeline">
+      <div class="ms"><span class="cap">$10k</span><span class="desc">First stock unlocked</span></div>
+      <div class="ms"><span class="cap">$30k</span><span class="desc">Second stock unlocked + distribution</span></div>
+      <div class="ms"><span class="cap">$50k</span><span class="desc">Third stock unlocked + distribution</span></div>
+      <div class="ms"><span class="cap">$70k</span><span class="desc">Fourth stock unlocked + distribution</span></div>
+      <div class="ms"><span class="cap">$90k</span><span class="desc">Fifth stock unlocked + distribution</span></div>
+      <div class="ms"><span class="cap">$110k</span><span class="desc">Sixth stock unlocked + distribution</span></div>
+      <div class="ms"><span class="cap">$130k</span><span class="desc">Seventh stock unlocked + distribution</span></div>
+    </div>
+    <p class="center muted" style="margin-top:30px">And the Machine keeps growing. One stock. Then another. Then another. And another.</p>
+  </section>
+
+  <div class="rule"></div>
+
+  <!-- WINDOW -->
+  <section class="stack fx center lead">
+    <p class="kicker">The Window Doesn't Stay Open Forever</p>
+    <h2>Most people arrive late.</h2>
+    <p>Most people ignore opportunities when they're small. Then they watch them explode. Then they wish they had paid attention.</p>
+    <p class="muted">The crowd always arrives after the headlines. After the screenshots. After the hype. After the story has already been written.</p>
+    <p>They were late to Bitcoin. They were late to Nvidia. They were late to the trends that reshaped entire markets.</p>
+    <p>Stock Machine was built for people who are tired of watching from the sidelines — <span class="accent">not to chase the next narrative, but to participate in a system designed to continuously accumulate assets as the ecosystem expands.</span></p>
+  </section>
+
+  <div class="rule"></div>
+
+  <!-- IMAGINE -->
+  <section class="stack fx center lead">
+    <p class="kicker">Imagine Looking Back</p>
+    <div class="final big" style="margin-top:0">
+      <span>10 stocks?</span><span class="a">20?</span><span>50?</span><span class="a">100?</span>
+    </div>
+    <p>What happens when every milestone unlocks another asset? When the Machine keeps expanding while others are still waiting to enter?</p>
+    <p class="accent" style="font-weight:700">The question isn't what the token is worth today. The question is: how large can the Machine become before the world catches on?</p>
+    <ul class="lines" style="max-width:46ch;margin:0 auto;text-align:left">
+      <li>Every milestone expands the vault.</li>
+      <li>Every new holder powers the next unlock.</li>
+      <li>Every new unlock makes the Machine stronger.</li>
+    </ul>
+  </section>
+
+  <div class="rule"></div>
+
+  <!-- FINAL CTA -->
+  <section class="final center stack fx">
+    <p class="kicker">Stock Machine</p>
+    <h2>Buy. Hold.<br>Let The Machine Work.</h2>
+    <a class="cta" href="#top">Join The Machine</a>
+    <div class="big">
+      <span class="a">The Future Is On-Chain.</span>
+    </div>
+    <p class="muted" style="margin-top:8px">
+      The Machine Never Sleeps. The Machine Never Stops.<br>
+      One Market Cap Milestone At A Time. One Stock At A Time.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  © Stock Machine — The Machine Never Sleeps.
+</footer>
+
+<script>
+(function(){
+  /* ----- Rotating video backgrounds (soft crossfade, muted, looping) ----- */
+  var vids = [document.getElementById('bgA'), document.getElementById('bgB')];
+  var current = 0;
+  var ROTATE_MS = 14000;
+
+  // Ensure autoplay works everywhere: muted + programmatic play, hide controls.
+  vids.forEach(function(v){
+    v.muted = true;
+    v.setAttribute('muted','');
+    var p = v.play();
+    if(p && p.catch){ p.catch(function(){}); }
+  });
+
+  function rotate(){
+    var next = current === 0 ? 1 : 0;
+    vids[next].classList.add('is-active');
+    vids[current].classList.remove('is-active');
+    // keep both playing so the swap is instant
+    var p = vids[next].play();
+    if(p && p.catch){ p.catch(function(){}); }
+    current = next;
+  }
+  setInterval(rotate, ROTATE_MS);
+
+  // Re-kick playback if a mobile browser pauses on tab return
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden){
+      vids.forEach(function(v){ var p=v.play(); if(p&&p.catch)p.catch(function(){}); });
+    }
+  });
+
+  /* ----- Hero letter reveal (soft stagger, no glitch) ----- */
+  var title = document.querySelector('.reveal-letters');
+  if(title && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+    var text = title.getAttribute('data-text') || title.textContent;
+    title.textContent = '';
+    var i = 0;
+    text.split(' ').forEach(function(word, wi){
+      if(wi > 0){ title.appendChild(document.createTextNode(' ')); }
+      var w = document.createElement('span');
+      w.className = 'word';
+      word.split('').forEach(function(ch){
+        var s = document.createElement('span');
+        s.className = 'ltr';
+        s.textContent = ch;
+        s.style.animationDelay = (0.25 + (i++)*0.055) + 's';
+        w.appendChild(s);
+      });
+      title.appendChild(w);
+    });
+  }
+
+  /* ----- Scroll reveal ----- */
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, {threshold:0.12});
+  document.querySelectorAll('.fx').forEach(function(el){ io.observe(el); });
+})();
+</script>
+</body>
+</html>
