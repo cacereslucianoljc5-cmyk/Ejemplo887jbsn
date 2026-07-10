@@ -2,10 +2,11 @@
 
 **Demo en vivo:** https://animaglb.vercel.app
 
-Visualizador interactivo que aplica automáticamente un paquete de **~290 animaciones** a
-**cualquier modelo 3D humanoide** (.glb / .gltf / .fbx) directamente en el navegador, al estilo
-del auto-rigging + animación de **Meshy AI**. Sin servidores: el retargeting de esqueleto ocurre
-100 % en el cliente.
+Visualizador interactivo que aplica automáticamente **~290 animaciones incluidas** (ampliables a
+**más de 2800** con la biblioteca CMU Mocap bajo demanda) a **cualquier modelo 3D humanoide**
+(.glb / .gltf / .fbx / .bvh) directamente en el navegador, al estilo del auto-rigging + animación
+de **Meshy AI**. Sin servidores: el retargeting de esqueleto ocurre 100 % en el cliente. Además
+puedes **descargar** el modelo con la animación aplicada en un solo `.glb`.
 
 ![AnimaGLB](https://raw.githubusercontent.com/cacereslucianoljc5-cmyk/Ejemplo887jbsn/refs/heads/claude/lucid-babbage-crvo95/docs/screenshot.png)
 
@@ -23,10 +24,18 @@ del auto-rigging + animación de **Meshy AI**. Sin servidores: el retargeting de
    - corrige el caso de armaduras escaladas tipo FBX (Armature a 0.01).
 4. **Reproduce con crossfade**, control de velocidad, bucle, esqueleto visible y cámara orbital.
 
-También puedes **arrastrar animaciones tuyas** (GLB/FBX de Mixamo «without skin», etc.) y se
-retargetean igual sobre el modelo cargado.
+También puedes **arrastrar animaciones tuyas** (GLB/FBX de Mixamo «without skin», o **`.bvh`**
+de cualquier captura de movimiento) y se retargetean igual sobre el modelo cargado.
 
-## Paquete de animaciones incluido (CC0)
+## Descargar el modelo animado
+
+El botón **«⬇ Descargar modelo + animación»** exporta el modelo cargado —con su esqueleto
+(incluido el **auto-rig** generado en el navegador para modelos sin huesos)— y la animación que
+estás viendo, en un único **`.glb`** listo para Blender, Unity o Unreal (`GLTFExporter`).
+
+## Biblioteca de animaciones
+
+### Incluidas (CC0, cargadas de inicio)
 
 | Paquete | Clips | Autor | Licencia |
 |---|---|---|---|
@@ -35,10 +44,22 @@ retargetean igual sobre el modelo cargado.
 | [KayKit Adventurers](https://kaylousberg.itch.io/kaykit-adventurers) | 76 | Kay Lousberg | CC0 1.0 |
 | Meshy auto-rigging (walk/run) | 2 | generadas con la API de Meshy | del usuario |
 
-Se investigaron también las librerías de animaciones de **Mixamo (Adobe)** y **Ready Player Me**,
-y se **descartaron a propósito**: sus licencias no permiten redistribución ni uso con avatares
-arbitrarios. Detalle completo de proyectos investigados (UniRig, Make-It-Animatable, RigNet,
-ossos, retargeting-threejs…) en el botón **«Librerías y proyectos»** de la app.
+### Biblioteca colosal: CMU Mocap (bajo demanda) 🎭
+
+El botón **«➕ Biblioteca CMU (2548)»** añade la **mayor colección de captura de movimiento
+gratuita que existe**: los **2548 movimientos** del *Carnegie-Mellon Graphics Lab Motion Capture
+Database* (`mocap.cs.cmu.edu`), que CMU publica **libre para cualquier uso** (investigación y
+comercial). Se usa la conversión BVH de Bruce Hahne (cgspeed), reflejada en GitHub por
+[una-dinosauria/cmu-mocap](https://github.com/una-dinosauria/cmu-mocap).
+
+Para no inflar el repositorio, **cada clip se transmite bajo demanda** (un `.bvh` por animación,
+vía `raw.githubusercontent.com`/jsDelivr con CORS abierto) y se retargetea en el navegador con
+`BVHLoader`. Andar, correr, saltar, bailar (salsa, breakdance), artes marciales, deportes
+(baloncesto, fútbol), acrobacias (volteretas), interacciones… miles de movimientos reales.
+
+Se investigaron también **Mixamo (Adobe)** y **Ready Player Me**, y se **descartaron a propósito**:
+sus licencias no permiten redistribución. Detalle completo de proyectos investigados (UniRig,
+Make-It-Animatable, RigNet, ossos, retargeting-threejs…) en el botón **«Librerías y proyectos»**.
 
 ## El modelo de ejemplo
 
@@ -73,8 +94,10 @@ Los binarios (modelo + packs) viven en `public/`. En despliegues donde no se sub
 
 ```
 index.html            UI (paneles, estilos)
-src/main.js           escena three.js, carga de modelos/packs, reproducción
+src/main.js           escena three.js, carga de modelos/packs, reproducción, descarga GLB
 src/retarget.js       ★ mapeo automático de huesos + retargeting
+src/autorig.js        auto-rigging en el navegador (modelos sin esqueleto)
+src/cmu.js            ★ biblioteca CMU Mocap (índice + streaming BVH bajo demanda)
 src/packs.js          definición del paquete de animaciones y categorías
 src/projects.js       investigación de librerías/proyectos (modal)
 scripts/fetch-assets.mjs  descarga de assets en el build de Vercel
@@ -88,4 +111,6 @@ public/models/        modelo de ejemplo (Meshy)
 
 - Código: MIT.
 - Animaciones incluidas: CC0 1.0 (Mesh2Motion, Quaternius, KayKit) — ver tabla arriba.
+- Biblioteca CMU Mocap: libre para cualquier uso (CMU Graphics Lab); conversión BVH de B. Hahne
+  sin restricciones añadidas. Se transmite desde el mirror, no se redistribuye en este repo.
 - Modelo de ejemplo y clips walk/run: generados con la cuenta de Meshy del autor del repo.

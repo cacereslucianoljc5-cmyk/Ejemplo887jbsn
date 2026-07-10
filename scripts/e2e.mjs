@@ -6,8 +6,13 @@ const SHOTS = '/tmp/claude-0/-home-user/ccf2a8f1-2401-5a5f-8b78-b041bf288819/scr
 import { mkdirSync } from 'node:fs';
 mkdirSync(SHOTS, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+// Enruta el tráfico externo (raw.githubusercontent para CMU) por el proxy del
+// sandbox; localhost queda excluido para no romper el preview.
+const proxy = process.env.HTTPS_PROXY
+  ? { server: process.env.HTTPS_PROXY, bypass: 'localhost,127.0.0.1' }
+  : undefined;
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', proxy });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, ignoreHTTPSErrors: true });
 
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -81,6 +86,49 @@ await page.screenshot({ path: SHOTS + '/06-skeleton.png' });
 // categorías
 const chips = await page.locator('.chip').allTextContents();
 console.log('CATEGORIAS:', chips.join(' | '));
+
+// ---- Descargar modelo + animación (GLTFExporter) ----
+await page.uncheck('#opt-skeleton');
+await page.fill('#search', 'Walk');
+await page.waitForTimeout(300);
+await page.locator('.anim-item').first().click();
+await page.waitForTimeout(1500);
+try {
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 40000 }),
+    page.click('#btn-download'),
+  ]);
+  const dlName = download.suggestedFilename();
+  const path = SHOTS + '/' + dlName;
+  await download.saveAs(path);
+  const { statSync } = await import('node:fs');
+  console.log('DESCARGA OK:', dlName, `(${(statSync(path).size / 1024).toFixed(0)} KB)`);
+} catch (e) {
+  console.log('DESCARGA FALLÓ:', e.message);
+}
+
+// ---- Biblioteca CMU (streaming bajo demanda) ----
+try {
+  await page.click('#btn-load-cmu');
+  await page.waitForFunction(() => window.__anima?.state?.cmuLoaded === true, { timeout: 60000 });
+  const totalAfterCmu = await page.textContent('#total-badge');
+  console.log('TOTAL TRAS CMU:', totalAfterCmu);
+  await page.fill('#search', 'walk');
+  await page.waitForTimeout(400);
+  const cmuRow = page.locator('.anim-item', { has: page.locator('.src', { hasText: 'CMU' }) }).first();
+  if (await cmuRow.count()) {
+    const cmuLabel = await cmuRow.locator('.name').textContent();
+    await cmuRow.click();
+    await page.waitForFunction(() => /retargeteada|Reproduciendo/i.test(document.querySelector('#status').textContent), { timeout: 45000 });
+    console.log('PLAY CMU ->', cmuLabel, '| status:', (await page.textContent('#status')).trim());
+    await page.waitForTimeout(1000);
+    await page.screenshot({ path: SHOTS + '/07-cmu.png' });
+  } else {
+    console.log('CMU: no se encontró fila con badge CMU tras filtrar');
+  }
+} catch (e) {
+  console.log('CMU FALLÓ:', e.message);
+}
 
 console.log('\nERRORES DE CONSOLA:', errors.length ? errors.slice(0, 10) : 'ninguno');
 await browser.close();

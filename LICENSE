@@ -33,3 +33,14 @@ Assets de terceros incluidos en public/anims/ (todos CC0 1.0 Universal, dominio 
 
 public/models/example.glb y public/anims/meshy_walking.glb / meshy_running.glb fueron
 generados con la API de Meshy (https://meshy.ai) por el propietario del repositorio.
+
+---
+
+Biblioteca CMU Mocap (opcional, transmitida bajo demanda; NO redistribuida en este repo):
+
+- Carnegie-Mellon Graphics Lab Motion Capture Database (http://mocap.cs.cmu.edu)
+  CMU la publica libre para cualquier uso (investigación y comercial). Se consume la
+  conversión BVH de Bruce Hahne (cgspeed), sin restricciones añadidas, a través del mirror
+  https://github.com/una-dinosauria/cmu-mocap (raw.githubusercontent.com / jsDelivr).
+  Los archivos .bvh se descargan en el navegador del usuario al aplicarlos; este repositorio
+  no incluye ni redistribuye copias de los datos.

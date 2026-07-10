@@ -341,6 +341,10 @@ export function retargetClipAuto(targetSkin, sourceRoot, clip, opts = {}) {
   let sceneRoot = targetSkin;
   while (sceneRoot.parent) sceneRoot = sceneRoot.parent;
   if (opts.bindPose) applyBindPose(opts.bindPose);
+  // Fuentes reutilizables (BVH/CMU) traen su pose de reposo: retargetClip deja la
+  // armadura origen en su último fotograma, así que la restauramos antes de leer
+  // las rotaciones base. Los paquetes GLTF no llevan restPose -> comportamiento intacto.
+  if (sourceRoot.userData && sourceRoot.userData.restPose) applyBindPose(sourceRoot.userData.restPose);
   sceneRoot.updateMatrixWorld(true);
   sourceRoot.updateMatrixWorld(true);
 
@@ -414,7 +418,9 @@ export function retargetClipAuto(targetSkin, sourceRoot, clip, opts = {}) {
 
   // restaurar pose bind tras el proceso
   if (opts.bindPose) applyBindPose(opts.bindPose);
+  if (sourceRoot.userData && sourceRoot.userData.restPose) applyBindPose(sourceRoot.userData.restPose);
   sceneRoot.updateMatrixWorld(true);
+  sourceRoot.updateMatrixWorld(true);
 
   return { clip: retargeted, mappedCount: mapped.length, targetBoneCount: targetBones.length, mappedSlots: mapped };
 }

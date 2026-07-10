@@ -47,11 +47,13 @@ export const PACKS = [
 ];
 
 const CATEGORY_RULES = [
-  ['Locomoción', /walk|run|jog|sprint|crouch|strafe|swim|climb|roll|dodge|jump|land|fall|caminar|correr/i],
-  ['Combate', /attack|punch|kick|sword|melee|ranged|shoot|shooting|pistol|block|spell|throw|aim|reload|hit|death|die|dualwield|golpe|muerte/i],
-  ['Baile y emotes', /dance|cheer|celebrat|wave|clap|baile|bow$|angry|confused|greeting|victory|emote|salute|yes$|no$/i],
-  ['Idle y poses', /idle|pose|tpose|t-pose|breath|stand|sleep/i],
-  ['Interacción', /sit|lie|pick|interact|use|fix|drive|push|talk|table|kneel|sentar|farm|harvest|consume|chest|water|plant|zombie|crawl|glide|fly/i],
+  ['Acrobacias', /cartwheel|flip|handstand|acrobat|tumble|somersault|backflip|frontflip|gymnast|breakdance|handspring|vault/i],
+  ['Deportes', /basketball|soccer|football|golf|tennis|baseball|volleyball|bowling|frisbee|dribble|sport|boxing|box\b|skateboard|hockey|racket/i],
+  ['Combate', /attack|punch|kick|sword|melee|ranged|shoot|shooting|pistol|block|spell|throw|aim|reload|hit|death|die|dualwield|fight|martial|karate|golpe|muerte/i],
+  ['Baile y emotes', /dance|salsa|waltz|tango|ballet|charleston|cheer|celebrat|wave|clap|baile|bow$|angry|confused|greeting|victory|emote|salute|yes$|no$/i],
+  ['Locomoción', /walk|run|jog|sprint|crouch|strafe|swim|climb|roll|dodge|jump|leap|hop|land|fall|march|tiptoe|caminar|correr/i],
+  ['Idle y poses', /idle|pose|tpose|t-pose|breath|stand|sleep|wait/i],
+  ['Interacción', /sit|lie|pick|interact|use|fix|drive|push|pull|talk|table|kneel|sentar|farm|harvest|consume|chest|water|plant|zombie|crawl|glide|fly|wash|drink|eat|clean|cook|stretch|exercise|playground|swing|climb/i],
 ];
 
 export function categorize(clipName) {

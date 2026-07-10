@@ -4,11 +4,14 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { BVHLoader } from 'three/addons/loaders/BVHLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { retargetClipAuto, findBestSkinnedMesh, collectBones, buildBoneMap, captureBindPose, applyBindPose } from './retarget.js';
 import { autoRig } from './autorig.js';
 import { PACKS, categorize, prettyName } from './packs.js';
+import { fetchCmuIndex, loadCmuClip } from './cmu.js';
 import { PROJECTS_HTML } from './projects.js';
 
 // ---------------------------------------------------------------------------
@@ -36,7 +39,11 @@ const state = {
   retargetCache: new Map(),
   modelUid: 0,
   packsReady: false,
+  cmuLoaded: false,
+  playReq: 0,
 };
+
+const RENDER_CAP = 500; // límite de filas dibujadas para mantener la lista fluida
 
 // ---------------------------------------------------------------------------
 // Escena
@@ -129,6 +136,8 @@ const gltfLoader = new GLTFLoader(manager)
   .setKTX2Loader(ktx2)
   .setMeshoptDecoder(MeshoptDecoder);
 const fbxLoader = new FBXLoader(manager);
+const bvhLoader = new BVHLoader(manager);
+const gltfExporter = new GLTFExporter();
 
 async function resolveAssetBase() {
   try {
@@ -229,21 +238,33 @@ function renderCategories() {
   }
 }
 
+function srcBadge(it) {
+  if (it.source === 'own') return 'modelo';
+  if (it.source === 'user') return 'subida';
+  if (it.source === 'cmu') return 'CMU';
+  return it.packLabel.split(' ')[0];
+}
+
 function renderList() {
   const list = document.getElementById('anim-list');
   const items = visibleItems();
+  const shown = items.slice(0, RENDER_CAP);
+  const capped = items.length > RENDER_CAP;
   document.getElementById('anim-count').textContent =
-    `${items.length} animación${items.length === 1 ? '' : 'es'}${state.filterCat !== 'Todas' ? ` · ${state.filterCat}` : ''}`;
-  list.innerHTML = '';
-  for (const it of items) {
+    `${items.length} animación${items.length === 1 ? '' : 'es'}${state.filterCat !== 'Todas' ? ` · ${state.filterCat}` : ''}` +
+    (capped ? ` · mostrando ${RENDER_CAP}, refina la búsqueda` : '');
+  const frag = document.createDocumentFragment();
+  for (const it of shown) {
     const row = document.createElement('div');
     row.className = 'anim-item' + (state.currentItemId === it.id ? ' playing' : '');
     row.innerHTML = `<span class="icon">${state.currentItemId === it.id ? '▶' : '▷'}</span>
       <span class="name" title="${it.pretty}">${it.pretty}</span>
-      <span class="src">${it.source === 'own' ? 'modelo' : it.source === 'user' ? 'subida' : it.packLabel.split(' ')[0]}</span>`;
+      <span class="src">${srcBadge(it)}</span>`;
     row.onclick = () => playItem(it);
-    list.appendChild(row);
+    frag.appendChild(row);
   }
+  list.innerHTML = '';
+  list.appendChild(frag);
 }
 
 // ---------------------------------------------------------------------------
@@ -397,10 +418,28 @@ function updateModelInfo() {
 // ---------------------------------------------------------------------------
 // Reproducción con retargeting
 // ---------------------------------------------------------------------------
-function playItem(item, fromDemo = false) {
+async function playItem(item, fromDemo = false) {
   if (!fromDemo) setDemo(false); // una elección manual apaga la demo automática
   if (!state.model) { toast('Primero carga un modelo (o usa el ejemplo).'); return; }
   const { skin, mixer } = state.model;
+  const myReq = ++state.playReq; // token para descartar descargas que el usuario ya reemplazó
+
+  // Las animaciones CMU se transmiten bajo demanda (un BVH por clip)
+  if (item.source === 'cmu' && !item.clip) {
+    if (!skin) { toast('El modelo no tiene esqueleto: no se pueden aplicar animaciones.', true); return; }
+    try {
+      setStatus(`Descargando «${item.pretty}» de la biblioteca CMU…`, true);
+      const { root, clip: bvhClip } = await loadCmuClip(item.clipName);
+      item.sourceRoot = root;
+      item.clip = bvhClip;
+    } catch (e) {
+      console.error(e);
+      toast(`No se pudo descargar la animación CMU «${item.clipName}»: ${e.message}`, true);
+      setStatus('Error al descargar la animación CMU.');
+      return;
+    }
+    if (state.playReq !== myReq) return; // el usuario pidió otra animación mientras descargaba
+  }
 
   let clip = null;
   if (item.source === 'own') {
@@ -483,7 +522,18 @@ async function handleFiles(files) {
     try {
       setStatus(`Cargando ${file.name}…`, true);
       let root, animations;
-      if (ext === 'fbx') {
+      if (ext === 'bvh') {
+        // BVH: solo animación (sin malla) -> se añade al catálogo como fuente de animación
+        const text = await file.text();
+        const { skeleton, clip } = bvhLoader.parse(text);
+        const bvhRoot = new THREE.Group();
+        bvhRoot.add(skeleton.bones[0]);
+        bvhRoot.updateMatrixWorld(true);
+        bvhRoot.userData.restPose = captureBindPose(bvhRoot);
+        clip.name = file.name.replace(/\.bvh$/i, '');
+        addUserAnimations(bvhRoot, [clip], file.name);
+        continue;
+      } else if (ext === 'fbx') {
         const obj = await loadFBX(url);
         root = obj; animations = obj.animations || [];
       } else if (ext === 'glb' || ext === 'gltf') {
@@ -500,27 +550,7 @@ async function handleFiles(files) {
         toast(`Modelo «${file.name}» cargado${animations.length ? ` con ${animations.length} animación(es) propia(s)` : ''}.`);
       } else {
         // armadura con animaciones y sin malla -> paquete de animaciones del usuario
-        root.updateMatrixWorld(true);
-        let added = 0;
-        for (const clip of animations) {
-          if (!clip.tracks.length) continue;
-          const pretty = `${prettyName(clip.name)} (${file.name})`;
-          state.catalog.unshift({
-            id: `user::${file.name}::${clip.name}::${Date.now()}`,
-            source: 'user',
-            packLabel: 'Subida',
-            clipName: clip.name,
-            pretty,
-            category: 'Subidas',
-            clip,
-            sourceRoot: root,
-          });
-          added++;
-        }
-        renderCategories();
-        renderList();
-        toast(`${added} animación(es) de «${file.name}» añadidas al catálogo.`);
-        setStatus(`${added} animaciones nuevas listas para aplicar.`);
+        addUserAnimations(root, animations, file.name);
       }
     } catch (e) {
       console.error(e);
@@ -530,6 +560,146 @@ async function handleFiles(files) {
       // no revocamos inmediatamente: GLTFLoader puede seguir leyendo recursos
       setTimeout(() => URL.revokeObjectURL(url), 30000);
     }
+  }
+}
+
+// Añade clips de una armadura (GLB/FBX sin malla o BVH) al catálogo del usuario
+function addUserAnimations(root, animations, fileName) {
+  root.updateMatrixWorld(true);
+  let added = 0;
+  for (const clip of animations) {
+    if (!clip.tracks.length) continue;
+    const pretty = `${prettyName(clip.name)} (${fileName})`;
+    state.catalog.unshift({
+      id: `user::${fileName}::${clip.name}::${Date.now()}::${added}`,
+      source: 'user',
+      packLabel: 'Subida',
+      clipName: clip.name,
+      pretty,
+      category: 'Subidas',
+      clip,
+      sourceRoot: root,
+    });
+    added++;
+  }
+  renderCategories();
+  renderList();
+  toast(`${added} animación(es) de «${fileName}» añadidas al catálogo.`);
+  setStatus(`${added} animaciones nuevas listas para aplicar.`);
+  autoPlayDefault();
+}
+
+// ---------------------------------------------------------------------------
+// Biblioteca CMU (la mayor colección de mocap gratuita: 2548 movimientos)
+// Se transmite bajo demanda: aquí solo cargamos el índice y creamos las fichas.
+// ---------------------------------------------------------------------------
+async function loadCmuLibrary() {
+  const btn = document.getElementById('btn-load-cmu');
+  if (state.cmuLoaded) return;
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Cargando índice CMU…'; }
+    setStatus('Cargando índice de la biblioteca CMU (mocap.cs.cmu.edu)…', true);
+    const index = await fetchCmuIndex();
+    let added = 0;
+    for (const m of index) {
+      const pretty = `${m.desc} · ${m.id}`;
+      state.catalog.push({
+        id: `cmu::${m.id}`,
+        source: 'cmu',
+        packLabel: 'CMU Mocap',
+        author: 'CMU Graphics Lab',
+        clipName: m.id,
+        pretty,
+        category: categorize(`${m.desc} ${m.subjectDesc}`),
+        clip: null,        // se descarga al reproducir
+        sourceRoot: null,
+      });
+      added++;
+    }
+    state.cmuLoaded = true;
+    document.getElementById('total-badge').textContent = `(${state.catalog.length})`;
+    renderCategories();
+    renderList();
+    if (btn) btn.remove();
+    toast(`Biblioteca CMU añadida: ${added.toLocaleString()} movimientos. Cada clip se descarga al aplicarlo.`);
+    setStatus(`Biblioteca CMU lista: ${added.toLocaleString()} movimientos de captura.`);
+  } catch (e) {
+    console.error(e);
+    toast(`No se pudo cargar la biblioteca CMU: ${e.message}`, true);
+    setStatus('Error al cargar la biblioteca CMU.');
+    if (btn) { btn.disabled = false; btn.textContent = '➕ Biblioteca CMU (2548)'; }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Descargar modelo + animación (GLB) — exporta el rig y el clip aplicado
+// ---------------------------------------------------------------------------
+function safeName(s) {
+  return (s || 'modelo').replace(/\.[^.]+$/, '').replace(/[^\w\-]+/g, '_').slice(0, 48) || 'modelo';
+}
+function triggerDownload(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+// Devuelve el clip que se está reproduciendo (ya retargeteado si viene de un paquete)
+function currentClipForExport() {
+  if (!state.currentItemId) return null;
+  const item = state.catalog.find((i) => i.id === state.currentItemId);
+  if (!item) return null;
+  if (item.source === 'own') return { clip: item.clip, item };
+  const inPlace = document.getElementById('opt-inplace').checked;
+  const useOffsets = document.getElementById('opt-offsets').checked;
+  const key = `${state.model.uid}|${item.id}|${inPlace ? 1 : 0}|${useOffsets ? 1 : 0}`;
+  const clip = state.retargetCache.get(key);
+  return clip ? { clip, item } : null;
+}
+
+async function downloadCurrent() {
+  if (!state.model) { toast('Primero carga un modelo.', true); return; }
+  setStatus('Exportando modelo a GLB…', true);
+
+  const picked = currentClipForExport();
+  const clips = [];
+  if (picked?.clip) {
+    const c = picked.clip.clone();
+    c.name = safeName(picked.item.pretty) || 'animacion';
+    clips.push(c);
+  }
+
+  // exportar desde la pose de reposo para una base limpia
+  const resume = state.currentItemId ? state.catalog.find((i) => i.id === state.currentItemId) : null;
+  state.model.mixer.stopAllAction();
+  if (state.model.bindPose) applyBindPose(state.model.bindPose);
+  state.model.root.updateMatrixWorld(true);
+
+  try {
+    const glb = await new Promise((resolve, reject) => {
+      gltfExporter.parse(
+        state.model.root,
+        (result) => resolve(result),
+        (err) => reject(err),
+        { binary: true, animations: clips, onlyVisible: false, embedImages: true },
+      );
+    });
+    const blob = new Blob([glb], { type: 'model/gltf-binary' });
+    const suffix = clips.length ? '_animado' : '_rig';
+    triggerDownload(blob, `${safeName(state.model.name)}${suffix}.glb`);
+    toast(clips.length ? 'Descarga lista: modelo + animación ✅' : 'Descarga lista: modelo con esqueleto ✅');
+    setStatus(clips.length
+      ? `Exportado «${safeName(state.model.name)}${suffix}.glb» con la animación «${picked.item.pretty}».`
+      : `Exportado «${safeName(state.model.name)}${suffix}.glb» (sin animación seleccionada).`);
+  } catch (e) {
+    console.error(e);
+    toast(`No se pudo exportar: ${e.message}`, true);
+    setStatus('Error al exportar el modelo.');
+  } finally {
+    if (resume) playItem(resume); // reanuda la reproducción
   }
 }
 
@@ -593,6 +763,9 @@ document.getElementById('btn-random').onclick = () => {
 };
 document.getElementById('btn-stop').onclick = stopAll;
 document.getElementById('btn-demo').onclick = () => setDemo(!demoTimer);
+document.getElementById('btn-download').onclick = downloadCurrent;
+document.getElementById('btn-download-top').onclick = downloadCurrent;
+document.getElementById('btn-load-cmu').onclick = loadCmuLibrary;
 
 const speedEl = document.getElementById('speed');
 speedEl.oninput = () => {

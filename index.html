@@ -193,7 +193,7 @@
         grid-template-areas: "header" "viewport" "right" "status";
       }
       header { flex-wrap: nowrap; overflow-x: auto; }
-      header .tag, #btn-projects, #btn-github { display: none; }
+      header .tag, #btn-projects, #btn-github, #btn-download-top { display: none; }
       #left { display: none; }
       #left.open {
         display: flex; position: fixed; top: 52px; left: 0; bottom: 28px;
@@ -212,6 +212,7 @@
       <span class="tag">retargeting automático · estilo Meshy AI</span>
       <div class="spacer"></div>
       <button class="btn small primary" id="btn-upload-top">⬆ Subir GLB</button>
+      <button class="btn small" id="btn-download-top">⬇ Descargar</button>
       <button class="btn small" id="mobile-left-toggle">☰ Opciones</button>
       <button class="btn small" id="btn-projects">📚 Librerías y proyectos</button>
       <a class="btn small" id="btn-github" href="#" target="_blank" rel="noopener">GitHub</a>
@@ -225,11 +226,11 @@
             <button class="btn primary" id="btn-upload" style="padding:12px;font-size:14px">⬆ Subir modelo GLB</button>
           </div>
           <div style="margin-top:8px">se anima <strong>automáticamente</strong> al cargarlo</div>
-          <div style="margin-top:6px">o arrastra aquí tu .glb / .gltf / .fbx<br />(también animaciones de Mixamo sin piel)</div>
+          <div style="margin-top:6px">o arrastra aquí tu .glb / .gltf / .fbx / .bvh<br />(también animaciones de Mixamo o CMU sin piel)</div>
           <div class="row">
             <button class="btn" id="btn-example">Cargar ejemplo (Meshy)</button>
           </div>
-          <input type="file" id="file-input" accept=".glb,.gltf,.fbx" multiple hidden />
+          <input type="file" id="file-input" accept=".glb,.gltf,.fbx,.bvh" multiple hidden />
         </div>
       </div>
 
@@ -237,6 +238,9 @@
         <h2>Modelo actual</h2>
         <div class="card" id="model-info">
           <div>Sin modelo cargado.</div>
+        </div>
+        <div class="row">
+          <button class="btn" id="btn-download" title="Exporta el modelo con su esqueleto y la animación que estás viendo, en formato .glb (Blender, Unity, Unreal…)">⬇ Descargar modelo + animación</button>
         </div>
       </div>
 
@@ -274,6 +278,9 @@
         <input type="text" id="search" placeholder="Buscar animación… (walk, attack, dance…)" />
         <div id="cats"></div>
         <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="btn-load-cmu" title="Añade la mayor biblioteca de captura de movimiento gratuita: 2548 animaciones de la Carnegie Mellon University. Cada clip se descarga al aplicarlo.">➕ Biblioteca CMU (2548)</button>
+        </div>
+        <div class="row" style="margin-top:8px">
           <button class="btn" id="btn-demo">🎬 Demo automática</button>
           <button class="btn" id="btn-random">🎲 Aleatoria</button>
           <button class="btn" id="btn-stop">⏹ Detener</button>
