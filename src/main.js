@@ -546,7 +546,13 @@ document.getElementById('btn-example').onclick = async () => {
   }
 };
 document.getElementById('btn-upload').onclick = () => document.getElementById('file-input').click();
-document.getElementById('file-input').onchange = (e) => handleFiles([...e.target.files]);
+document.getElementById('btn-upload-top').onclick = () => document.getElementById('file-input').click();
+document.getElementById('mobile-left-toggle').onclick = () =>
+  document.getElementById('left').classList.toggle('open');
+document.getElementById('file-input').onchange = (e) => {
+  document.getElementById('left').classList.remove('open'); // cerrar panel móvil al elegir archivo
+  handleFiles([...e.target.files]);
+};
 document.getElementById('dropzone').onclick = (e) => {
   if (e.target.tagName !== 'BUTTON') document.getElementById('file-input').click();
 };

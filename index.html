@@ -185,14 +185,23 @@
       z-index: 40; transition: width .3s ease; opacity: 0;
     }
     #loading-bar.visible { opacity: 1; }
+    #mobile-left-toggle { display: none; }
     @media (max-width: 980px) {
       #app {
         grid-template-columns: 1fr;
         grid-template-rows: 52px 45vh 1fr 28px;
         grid-template-areas: "header" "viewport" "right" "status";
       }
+      header { flex-wrap: nowrap; overflow-x: auto; }
+      header .tag, #btn-projects, #btn-github { display: none; }
       #left { display: none; }
-      #mobile-left-toggle { display: inline-flex !important; }
+      #left.open {
+        display: flex; position: fixed; top: 52px; left: 0; bottom: 28px;
+        width: min(320px, 88vw); z-index: 45;
+        border-right: 1px solid var(--border);
+        box-shadow: 12px 0 40px rgba(0,0,0,.55);
+      }
+      #mobile-left-toggle { display: inline-flex; }
     }
   </style>
 </head>
@@ -202,6 +211,8 @@
       <h1><span class="logo">◆</span> AnimaGLB</h1>
       <span class="tag">retargeting automático · estilo Meshy AI</span>
       <div class="spacer"></div>
+      <button class="btn small primary" id="btn-upload-top">⬆ Subir GLB</button>
+      <button class="btn small" id="mobile-left-toggle">☰ Opciones</button>
       <button class="btn small" id="btn-projects">📚 Librerías y proyectos</button>
       <a class="btn small" id="btn-github" href="#" target="_blank" rel="noopener">GitHub</a>
     </header>
