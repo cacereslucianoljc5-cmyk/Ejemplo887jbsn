@@ -215,6 +215,35 @@ export async function swap(signer, tokenIn, tokenOut, amountIn, slippageBps) {
   return { txHash: tx.hash, amountOutMin, quote };
 }
 
+// Envía ETH nativo. amount = null significa "todo menos una reserva de gas".
+export async function transferEth(signer, to, amount) {
+  let value = amount;
+  if (value === null) {
+    const [balance, fee] = await Promise.all([
+      provider.getBalance(signer.address),
+      provider.getFeeData(),
+    ]);
+    const gasPrice = fee.maxFeePerGas ?? fee.gasPrice ?? 0n;
+    const reserve = 21000n * gasPrice * 2n; // margen para cubrir el gas del envío
+    value = balance > reserve ? balance - reserve : 0n;
+  }
+  if (value <= 0n) throw new Error("Insufficient ETH balance to withdraw.");
+  const tx = await signer.sendTransaction({ to, value });
+  await tx.wait();
+  return tx.hash;
+}
+
+// Envía un token ERC-20 (ej: WETH). amount = null significa "todo el balance".
+export async function transferToken(signer, tokenAddress, to, amount) {
+  const token = erc20(tokenAddress, signer);
+  let value = amount;
+  if (value === null) value = await token.balanceOf(signer.address);
+  if (value <= 0n) throw new Error("Insufficient balance to withdraw.");
+  const tx = await token.transfer(to, value);
+  await tx.wait();
+  return tx.hash;
+}
+
 export function fmt(amount, decimals, maxFrac = 4) {
   const value = Number(formatUnits(amount, decimals));
   if (value === 0) return "0";

@@ -11,13 +11,17 @@ import {
   getBalances,
   bestQuote,
   swap,
+  transferEth,
+  transferToken,
   fmt,
+  formatUnits,
   parseUnits,
 } from "./chain.js";
 import {
   mainMenuText,
   mainMenuKeyboard,
   walletMenuKeyboard,
+  withdrawKeyboard,
   settingsText,
   settingsKeyboard,
   tokenPanelKeyboard,
@@ -39,23 +43,166 @@ async function hoodInfo() {
   return getTokenInfo(config.hoodToken);
 }
 
-// ---------- Menús ----------
+// Registra una compra en la posición (cost basis en WETH + tokens recibidos).
+function recordBuy(userId, token, spentWeth, receivedTokens) {
+  updateUser(userId, (u) => {
+    const p = u.positions[token.address] || {
+      symbol: token.symbol,
+      decimals: token.decimals,
+      costWeth: "0",
+      tokens: "0",
+    };
+    p.symbol = token.symbol;
+    p.decimals = token.decimals;
+    p.costWeth = (BigInt(p.costWeth) + spentWeth).toString();
+    p.tokens = (BigInt(p.tokens) + receivedTokens).toString();
+    u.positions[token.address] = p;
+  });
+}
+
+// Registra una venta: reduce cost basis y tokens proporcionalmente.
+function recordSell(userId, tokenAddress, soldTokens) {
+  updateUser(userId, (u) => {
+    const p = u.positions[tokenAddress];
+    if (!p) return;
+    const prev = BigInt(p.tokens);
+    if (prev <= 0n || soldTokens >= prev) {
+      delete u.positions[tokenAddress];
+      return;
+    }
+    const remaining = prev - soldTokens;
+    p.costWeth = ((BigInt(p.costWeth) * remaining) / prev).toString();
+    p.tokens = remaining.toString();
+  });
+}
+
+// Calcula el PnL % de cada posición contra el precio actual (quote a WETH).
+async function computePositions(userId, walletAddress) {
+  const { positions } = getUser(userId);
+  const entries = Object.entries(positions);
+  if (!entries.length) return [];
+  const results = await Promise.all(
+    entries.map(async ([addr, pos]) => {
+      try {
+        const bal = await erc20(addr).balanceOf(walletAddress);
+        if (bal <= 0n) return { addr, closed: true };
+        const q = await bestQuote(addr, config.hoodToken, bal);
+        const avgEntry =
+          Number(formatUnits(BigInt(pos.tokens), pos.decimals)) > 0
+            ? Number(formatUnits(BigInt(pos.costWeth), 18)) /
+              Number(formatUnits(BigInt(pos.tokens), pos.decimals))
+            : 0;
+        const curPrice =
+          Number(formatUnits(bal, pos.decimals)) > 0
+            ? Number(formatUnits(q.amountOut, 18)) / Number(formatUnits(bal, pos.decimals))
+            : 0;
+        const pnl = avgEntry > 0 ? (curPrice / avgEntry - 1) * 100 : null;
+        return { addr, symbol: pos.symbol, pnl };
+      } catch {
+        return { addr, symbol: pos.symbol, error: true };
+      }
+    })
+  );
+  const closed = results.filter((r) => r.closed).map((r) => r.addr);
+  if (closed.length) {
+    updateUser(userId, (u) => closed.forEach((a) => delete u.positions[a]));
+  }
+  return results.filter((r) => !r.closed);
+}
+
+// Construye el menú principal con balances y posiciones (estilo Trojan).
+async function buildMainMenu(userId) {
+  const address = wallets.getAddress(userId);
+  if (!address) {
+    return { text: mainMenuText(null), keyboard: mainMenuKeyboard(false) };
+  }
+  const [base, balances, positions] = await Promise.all([
+    hoodInfo().catch(() => ({ symbol: "WETH", decimals: 18 })),
+    getBalances(address).catch(() => null),
+    computePositions(userId, address).catch(() => []),
+  ]);
+
+  const lines = [
+    "🤖 <b>HOOD Bot</b> — trading on Robinhood Chain",
+    `💼 <code>${address}</code>`,
+  ];
+  if (balances) {
+    lines.push(
+      "",
+      `⛽ ETH  <b>${fmt(balances.eth, 18, 6)}</b>`,
+      `💰 ${base.symbol}  <b>${fmt(balances.hood, base.decimals)}</b>`
+    );
+  }
+  if (positions.length) {
+    lines.push("", "📊 <b>Positions</b>");
+    for (const p of positions) {
+      if (p.error || p.pnl === null) {
+        lines.push(`• <b>${p.symbol}</b>  —`);
+      } else {
+        const tag = p.pnl >= 0 ? `🟢 +${p.pnl.toFixed(1)}%` : `🔴 ${p.pnl.toFixed(1)}%`;
+        lines.push(`• <b>${p.symbol}</b>  ${tag}`);
+      }
+    }
+  }
+  lines.push("", "📥 Paste a token <b>CA</b> to trade.");
+  return { text: lines.join("\n"), keyboard: mainMenuKeyboard(true) };
+}
+
+// ---------- Menu ----------
 
 bot.command("start", async (ctx) => {
-  const address = wallets.getAddress(ctx.from.id);
-  await ctx.reply(mainMenuText(address), {
-    ...HTML,
-    reply_markup: mainMenuKeyboard(Boolean(address)),
-  });
+  const { text, keyboard } = await buildMainMenu(ctx.from.id);
+  await ctx.reply(text, { ...HTML, reply_markup: keyboard });
 });
 
 bot.callbackQuery("menu:main", async (ctx) => {
   await ctx.answerCallbackQuery();
+  const { text, keyboard } = await buildMainMenu(ctx.from.id);
+  await ctx.editMessageText(text, { ...HTML, reply_markup: keyboard });
+});
+
+bot.callbackQuery("menu:refresh", async (ctx) => {
+  await ctx.answerCallbackQuery({ text: "Refreshing…" });
+  try {
+    const { text, keyboard } = await buildMainMenu(ctx.from.id);
+    await ctx.editMessageText(text, { ...HTML, reply_markup: keyboard });
+  } catch (err) {
+    if (!/message is not modified/i.test(err.message ?? "")) {
+      await ctx.reply(`❌ ${err.message}`);
+    }
+  }
+});
+
+bot.callbackQuery("menu:withdraw", async (ctx) => {
+  await ctx.answerCallbackQuery();
   const address = wallets.getAddress(ctx.from.id);
-  await ctx.editMessageText(mainMenuText(address), {
-    ...HTML,
-    reply_markup: mainMenuKeyboard(Boolean(address)),
-  });
+  if (!address) {
+    await ctx.reply("You don't have a wallet yet.");
+    return;
+  }
+  const [base, balances] = await Promise.all([
+    hoodInfo().catch(() => ({ symbol: "WETH", decimals: 18 })),
+    getBalances(address).catch(() => null),
+  ]);
+  const lines = ["💸 <b>Withdraw</b>", ""];
+  if (balances) {
+    lines.push(
+      `⛽ ETH: <b>${fmt(balances.eth, 18, 6)}</b>`,
+      `💰 ${base.symbol}: <b>${fmt(balances.hood, base.decimals)}</b>`
+    );
+  }
+  lines.push("", "Choose what to withdraw.");
+  await ctx.editMessageText(lines.join("\n"), { ...HTML, reply_markup: withdrawKeyboard() });
+});
+
+bot.callbackQuery(/^wd:(eth|weth)$/, async (ctx) => {
+  await ctx.answerCallbackQuery();
+  const asset = ctx.match[1];
+  pending.set(ctx.from.id, { type: "withdraw", asset });
+  await ctx.reply(
+    `💸 Withdraw <b>${asset.toUpperCase()}</b>. Send:\n<code>&lt;destination address&gt; &lt;amount or "all"&gt;</code>\n\nExample: <code>0xABC... 0.1</code> or <code>0xABC... all</code>`,
+    HTML
+  );
 });
 
 bot.callbackQuery("menu:wallet", async (ctx) => {
@@ -283,7 +430,11 @@ async function executeBuy(ctx, tokenAddress, hoodAmountText) {
     status = await ctx.reply(
       `⏳ Buying ${token.symbol} with ${hoodAmountText} ${hood.symbol}…`
     );
+    const tokenBefore = await erc20(tokenAddress).balanceOf(signer.address);
     const result = await swap(signer, config.hoodToken, tokenAddress, amountIn, settings.slippageBps);
+    const tokenAfter = await erc20(tokenAddress).balanceOf(signer.address);
+    const received = tokenAfter - tokenBefore;
+    recordBuy(userId, token, amountIn, received > 0n ? received : result.amountOutMin);
 
     await ctx.api.editMessageText(
       status.chat.id,
@@ -292,7 +443,7 @@ async function executeBuy(ctx, tokenAddress, hoodAmountText) {
         `✅ <b>Buy executed</b>`,
         "",
         `🟢 Spent: <b>${hoodAmountText} ${hood.symbol}</b>`,
-        `📦 Guaranteed minimum: <b>${fmt(result.amountOutMin, token.decimals)} ${token.symbol}</b>`,
+        `📦 Received: <b>${fmt(received, token.decimals)} ${token.symbol}</b>`,
         `🔗 <a href="${txLink(result.txHash)}">View transaction</a>`,
       ].join("\n"),
       HTML
@@ -329,6 +480,7 @@ bot.callbackQuery(/^s:(25|50|100):(0x[0-9a-fA-F]{40})$/, async (ctx) => {
 
     status = await ctx.reply(`⏳ Selling ${percent}% of your ${token.symbol}…`);
     const result = await swap(signer, tokenAddress, config.hoodToken, amountIn, settings.slippageBps);
+    recordSell(userId, tokenAddress, amountIn);
 
     await ctx.api.editMessageText(
       status.chat.id,
@@ -416,6 +568,55 @@ bot.on("message:text", async (ctx) => {
           u.settings.buyAmounts = amounts;
         });
         await ctx.reply(`✅ Buy amounts: ${amounts.join(", ")} WETH.`);
+        return;
+      }
+      case "withdraw": {
+        const parts = text.split(/\s+/).filter(Boolean);
+        const to = normalizeAddress(parts[0] ?? "");
+        const amountStr = (parts[1] ?? "all").toLowerCase();
+        if (!to) {
+          await ctx.reply("❌ Invalid destination address. Format: <code>&lt;address&gt; &lt;amount or all&gt;</code>", HTML);
+          return;
+        }
+        if (!wallets.hasWallet(userId)) {
+          await ctx.reply("⚠️ You don't have a wallet.");
+          return;
+        }
+        const isAll = amountStr === "all";
+        let amount = null;
+        if (!isAll) {
+          if (!/^[0-9]*\.?[0-9]+$/.test(amountStr)) {
+            await ctx.reply("❌ Invalid amount. Use a number or 'all'.");
+            return;
+          }
+          amount = parseUnits(amountStr, 18); // ETH y WETH tienen 18 decimales
+        }
+        let status;
+        try {
+          const signer = wallets.getSigner(userId, provider);
+          status = await ctx.reply(
+            `⏳ Withdrawing ${isAll ? "all" : amountStr} ${waiting.asset.toUpperCase()}…`
+          );
+          const hash =
+            waiting.asset === "eth"
+              ? await transferEth(signer, to, amount)
+              : await transferToken(signer, config.weth, to, amount);
+          await ctx.api.editMessageText(
+            status.chat.id,
+            status.message_id,
+            [
+              `✅ <b>Withdrawal sent</b>`,
+              "",
+              `📤 To: <code>${to}</code>`,
+              `🔗 <a href="${txLink(hash)}">View transaction</a>`,
+            ].join("\n"),
+            HTML
+          );
+        } catch (err) {
+          const message = `❌ Withdrawal failed: ${err.shortMessage ?? err.message}`;
+          if (status) await ctx.api.editMessageText(status.chat.id, status.message_id, message);
+          else await ctx.reply(message);
+        }
         return;
       }
     }

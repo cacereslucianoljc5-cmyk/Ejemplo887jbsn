@@ -34,9 +34,12 @@ export function getUser(telegramId) {
         slippageBps: config.defaultSlippageBps,
         buyAmounts: [...config.defaultBuyAmounts],
       },
+      // positions[tokenAddress] = { symbol, decimals, costWeth, tokens } (bigints como string)
+      positions: {},
     };
     save();
   }
+  if (!users[id].positions) users[id].positions = {};
   return users[id];
 }
 

@@ -16,7 +16,10 @@ export function mainMenuText(address) {
 export function mainMenuKeyboard(hasWallet) {
   const kb = new InlineKeyboard();
   if (hasWallet) {
-    kb.text("💼 Wallet", "menu:wallet").text("⚙️ Settings", "menu:settings");
+    kb.text("💼 Wallet", "menu:wallet").text("⚙️ Settings", "menu:settings")
+      .row()
+      .text("💸 Withdraw", "menu:withdraw")
+      .text("🔄 Refresh", "menu:refresh");
   } else {
     kb.text("🆕 Create wallet", "w:create")
       .text("📥 Import", "w:import")
@@ -24,6 +27,14 @@ export function mainMenuKeyboard(hasWallet) {
       .text("⚙️ Settings", "menu:settings");
   }
   return kb;
+}
+
+export function withdrawKeyboard() {
+  return new InlineKeyboard()
+    .text("💸 Withdraw ETH", "wd:eth")
+    .text("💸 Withdraw WETH", "wd:weth")
+    .row()
+    .text("🏠 Menu", "menu:main");
 }
 
 export function walletMenuKeyboard() {
