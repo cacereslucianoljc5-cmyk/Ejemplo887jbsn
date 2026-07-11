@@ -64,6 +64,37 @@ Robinhood Chain es una red muy nueva, así que **verificá siempre las direccion
 | Vender | Desde el panel del token: 25 % / 50 % / 100 % |
 | Slippage y montos | Menú "⚙️ Ajustes" |
 
+## Despliegue
+
+El bot usa **long polling**: no necesita dominio, webhook ni puerto abierto — solo un proceso corriendo 24/7 con salida a internet.
+
+### Opción A: cualquier VPS / tu PC
+
+```bash
+cd hood-bot
+npm install
+cp .env.example .env   # completar valores
+npm start              # o con pm2: pm2 start src/index.js --name hood-bot
+```
+
+### Opción B: Fly.io (incluye `Dockerfile` + `fly.toml`)
+
+```bash
+cd hood-bot
+fly launch --no-deploy --copy-config
+fly volumes create hood_bot_data --size 1   # persiste las billeteras cifradas
+fly secrets set \
+  TELEGRAM_BOT_TOKEN=123456:ABC... \
+  WALLET_ENCRYPTION_KEY=$(openssl rand -hex 32) \
+  HOOD_TOKEN_ADDRESS=0x... \
+  WETH_ADDRESS=0x... \
+  UNISWAP_V2_ROUTER=0x...
+fly deploy
+fly logs   # deberías ver "Bot conectado como @tu_bot"
+```
+
+⚠️ Guardá el `WALLET_ENCRYPTION_KEY` que generes: sin él no se pueden descifrar las billeteras guardadas.
+
 ## Seguridad
 
 - Las claves privadas se guardan **cifradas con AES-256-GCM** (clave derivada con scrypt desde `WALLET_ENCRYPTION_KEY`) en `data/store.json`.

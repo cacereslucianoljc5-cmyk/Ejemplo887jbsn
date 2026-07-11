@@ -1,0 +1,30 @@
+# Config de Fly.io para HOOD Bot.
+# El bot usa long polling (no expone puertos), corre como worker 24/7.
+#
+# Deploy:
+#   fly launch --no-deploy --copy-config   # primera vez
+#   fly volumes create hood_bot_data --size 1
+#   fly secrets set TELEGRAM_BOT_TOKEN=... WALLET_ENCRYPTION_KEY=... \
+#     HOOD_TOKEN_ADDRESS=0x... WETH_ADDRESS=0x... UNISWAP_V2_ROUTER=0x...
+#   fly deploy
+
+app = "hood-bot"
+primary_region = "eze"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Volumen persistente: acá viven las billeteras cifradas (data/store.json).
+[mounts]
+  source = "hood_bot_data"
+  destination = "/app/data"
+
+[env]
+  DATA_DIR = "/app/data"
+  RPC_URL = "https://rpc.mainnet.chain.robinhood.com"
+  CHAIN_ID = "4663"
+  EXPLORER_URL = "https://robinhoodchain.blockscout.com"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
