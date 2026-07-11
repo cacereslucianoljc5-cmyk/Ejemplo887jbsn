@@ -91,7 +91,7 @@ export async function resolveTradeToken(address) {
     return { address: getAddress(chosen), fromPool: true };
   } catch {
     throw new Error(
-      "Ese CA no es un token ERC-20 ni un pool que pueda leer. ¿Es la dirección correcta?"
+      "That CA is neither an ERC-20 token nor a pool I can read. Is the address correct?"
     );
   }
 }
@@ -163,7 +163,7 @@ export async function bestQuote(tokenIn, tokenOut, amountIn) {
   const options = [v2, v3].filter(Boolean);
   if (!options.length) {
     throw new Error(
-      "No encontré liquidez para ese par en Uniswap V2 ni V3. ¿El CA es correcto?"
+      "No liquidity found for that pair on Uniswap V2 or V3. Is the CA correct?"
     );
   }
   return options.reduce((a, b) => (b.amountOut > a.amountOut ? b : a));

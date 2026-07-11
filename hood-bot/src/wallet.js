@@ -61,7 +61,7 @@ export function importWallet(telegramId, privateKey) {
 
 export function getPrivateKey(telegramId) {
   const stored = getUser(telegramId).wallet;
-  if (!stored) throw new Error("No hay billetera para este usuario.");
+  if (!stored) throw new Error("No wallet for this user.");
   return decrypt(stored);
 }
 

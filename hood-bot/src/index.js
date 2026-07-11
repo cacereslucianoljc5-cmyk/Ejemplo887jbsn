@@ -63,8 +63,8 @@ bot.callbackQuery("menu:wallet", async (ctx) => {
   const address = wallets.getAddress(ctx.from.id);
   await ctx.editMessageText(
     address
-      ? `💼 <b>Billetera</b>\n\n<code>${address}</code>\n\n⛽ Recordá: el gas de Robinhood Chain se paga en ETH; mandá un poco de ETH a esta dirección además de tus HOOD.`
-      : "💼 No tenés billetera todavía.",
+      ? `💼 <b>Wallet</b>\n\n<code>${address}</code>\n\n⛽ Reminder: gas on Robinhood Chain is paid in ETH; send a little ETH to this address in addition to your WETH.`
+      : "💼 You don't have a wallet yet.",
     { ...HTML, reply_markup: walletMenuKeyboard() }
   );
 });
@@ -72,20 +72,21 @@ bot.callbackQuery("menu:wallet", async (ctx) => {
 bot.callbackQuery("menu:settings", async (ctx) => {
   await ctx.answerCallbackQuery();
   const { settings } = getUser(ctx.from.id);
-  await ctx.editMessageText(settingsText(settings), {
+  const base = await hoodInfo().catch(() => ({ symbol: "WETH" }));
+  await ctx.editMessageText(settingsText(settings, base.symbol), {
     ...HTML,
     reply_markup: settingsKeyboard(),
   });
 });
 
-// ---------- Billetera ----------
+// ---------- Wallet ----------
 
 bot.callbackQuery("w:create", async (ctx) => {
   await ctx.answerCallbackQuery();
   if (wallets.hasWallet(ctx.from.id)) {
     pending.set(ctx.from.id, { type: "confirmCreate" });
     await ctx.reply(
-      "⚠️ Ya tenés una billetera guardada. Crear una nueva la <b>reemplaza</b> (la anterior se pierde si no exportaste la clave).\n\nEscribí <b>SI</b> para confirmar, o cualquier otra cosa para cancelar.",
+      "⚠️ You already have a saved wallet. Creating a new one <b>replaces</b> it (the old one is lost if you didn't export its key).\n\nType <b>YES</b> to confirm, or anything else to cancel.",
       HTML
     );
     return;
@@ -97,14 +98,14 @@ async function doCreateWallet(ctx) {
   const { address, mnemonic } = wallets.createWallet(ctx.from.id);
   await ctx.reply(
     [
-      "✅ <b>Billetera creada</b>",
+      "✅ <b>Wallet created</b>",
       "",
-      `📬 Dirección: <code>${address}</code>`,
+      `📬 Address: <code>${address}</code>`,
       "",
-      "🔐 <b>Frase semilla (guardala YA, no se vuelve a mostrar ni se guarda):</b>",
+      "🔐 <b>Seed phrase (save it NOW — it won't be shown again and is not stored):</b>",
       `<tg-spoiler><code>${mnemonic}</code></tg-spoiler>`,
       "",
-      "Mandá HOOD a esa dirección para comprar, y algo de ETH para el gas.",
+      "Send WETH to that address to buy, and some ETH for gas.",
     ].join("\n"),
     { ...HTML, reply_markup: mainMenuKeyboard(true) }
   );
@@ -114,7 +115,7 @@ bot.callbackQuery("w:import", async (ctx) => {
   await ctx.answerCallbackQuery();
   pending.set(ctx.from.id, { type: "import" });
   await ctx.reply(
-    "📥 Mandame la <b>clave privada</b> (empieza con 0x…).\n\n⚠️ Borrá el mensaje después de mandarlo. Usá este bot solo si lo hosteás vos.",
+    "📥 Send me the <b>private key</b> (starts with 0x…).\n\n⚠️ Delete the message after sending it. Only use this bot if you self-host it.",
     HTML
   );
 });
@@ -122,12 +123,12 @@ bot.callbackQuery("w:import", async (ctx) => {
 bot.callbackQuery("w:export", async (ctx) => {
   await ctx.answerCallbackQuery();
   if (!wallets.hasWallet(ctx.from.id)) {
-    await ctx.reply("No tenés billetera para exportar.");
+    await ctx.reply("You don't have a wallet to export.");
     return;
   }
   const key = wallets.getPrivateKey(ctx.from.id);
   await ctx.reply(
-    `🔑 Tu clave privada:\n<tg-spoiler><code>${key}</code></tg-spoiler>\n\n⚠️ Guardala en un lugar seguro y borrá este mensaje.`,
+    `🔑 Your private key:\n<tg-spoiler><code>${key}</code></tg-spoiler>\n\n⚠️ Store it somewhere safe and delete this message.`,
     HTML
   );
 });
@@ -136,14 +137,14 @@ bot.callbackQuery("w:balance", async (ctx) => {
   await ctx.answerCallbackQuery();
   const address = wallets.getAddress(ctx.from.id);
   if (!address) {
-    await ctx.reply("No tenés billetera todavía.");
+    await ctx.reply("You don't have a wallet yet.");
     return;
   }
   try {
     const [hood, balances] = await Promise.all([hoodInfo(), getBalances(address)]);
     await ctx.reply(
       [
-        `💰 <b>Balance de</b> <code>${short(address)}</code>`,
+        `💰 <b>Balance of</b> <code>${short(address)}</code>`,
         "",
         `⛽ ETH (gas): <b>${fmt(balances.eth, 18, 6)}</b>`,
         `🪙 ${hood.symbol}: <b>${fmt(balances.hood, hood.decimals)}</b>`,
@@ -151,28 +152,28 @@ bot.callbackQuery("w:balance", async (ctx) => {
       HTML
     );
   } catch (err) {
-    await ctx.reply(`❌ No pude leer el balance: ${err.message}`);
+    await ctx.reply(`❌ Couldn't read the balance: ${err.message}`);
   }
 });
 
-// ---------- Ajustes ----------
+// ---------- Settings ----------
 
 bot.callbackQuery("set:slip", async (ctx) => {
   await ctx.answerCallbackQuery();
   pending.set(ctx.from.id, { type: "slippage" });
-  await ctx.reply("📉 Mandame el slippage en % (ej: <code>1</code> o <code>2.5</code>).", HTML);
+  await ctx.reply("📉 Send me the slippage in % (e.g. <code>1</code> or <code>2.5</code>).", HTML);
 });
 
 bot.callbackQuery("set:amounts", async (ctx) => {
   await ctx.answerCallbackQuery();
   pending.set(ctx.from.id, { type: "amounts" });
   await ctx.reply(
-    "💵 Mandame los montos de compra en HOOD separados por coma (ej: <code>10,50,100,500</code>). Máximo 6.",
+    "💵 Send me the buy amounts in WETH separated by commas (e.g. <code>0.01,0.05,0.1,0.5</code>). Max 6.",
     HTML
   );
 });
 
-// ---------- Panel de token ----------
+// ---------- Token panel ----------
 
 async function renderTokenPanel(ctx, tokenAddress, { edit = false } = {}) {
   const userId = ctx.from.id;
@@ -182,12 +183,12 @@ async function renderTokenPanel(ctx, tokenAddress, { edit = false } = {}) {
   const [hood, token] = await Promise.all([hoodInfo(), getTokenInfo(tokenAddress)]);
 
   if (tokenAddress.toLowerCase() === config.hoodToken.toLowerCase()) {
-    await ctx.reply("Ese CA es el propio token HOOD 🙂 — pegá el CA del token que querés comprar.");
+    await ctx.reply("That CA is the base token itself 🙂 — paste the CA of the token you want to buy.");
     return;
   }
 
-  // Precio de referencia: cuánto sale 1 HOOD en el token destino.
-  let priceLine = "💱 Precio: sin liquidez detectada";
+  // Reference price: how much of the target token 1 base unit buys.
+  let priceLine = "💱 Price: no liquidity detected";
   try {
     const oneHood = parseUnits("1", hood.decimals);
     const q = await bestQuote(config.hoodToken, tokenAddress, oneHood);
@@ -196,10 +197,10 @@ async function renderTokenPanel(ctx, tokenAddress, { edit = false } = {}) {
         ? `Uniswap V3 · ${q.fee / 10000}%`
         : q.path.length === 2
           ? "Uniswap V2"
-          : "Uniswap V2 · vía WETH";
+          : "Uniswap V2 · via WETH";
     priceLine = `💱 1 ${hood.symbol} ≈ <b>${fmt(q.amountOut, token.decimals)} ${token.symbol}</b> (${route})`;
   } catch {
-    // Se muestra "sin liquidez"; los botones de compra igual validan al ejecutar.
+    // Shows "no liquidity"; the buy buttons still validate at execution time.
   }
 
   const lines = [
@@ -213,19 +214,19 @@ async function renderTokenPanel(ctx, tokenAddress, { edit = false } = {}) {
     const balances = await getBalances(walletAddress, tokenAddress);
     lines.push(
       "",
-      `💼 Tus ${hood.symbol}: <b>${fmt(balances.hood, hood.decimals)}</b>`,
-      `📦 Tus ${token.symbol}: <b>${fmt(balances.token, token.decimals)}</b>`,
+      `💼 Your ${hood.symbol}: <b>${fmt(balances.hood, hood.decimals)}</b>`,
+      `📦 Your ${token.symbol}: <b>${fmt(balances.token, token.decimals)}</b>`,
       `⛽ ETH: <b>${fmt(balances.eth, 18, 6)}</b>`
     );
   } else {
-    lines.push("", "⚠️ Creá o importá una billetera para poder comprar.");
+    lines.push("", "⚠️ Create or import a wallet to be able to buy.");
   }
 
-  lines.push("", `¿Cuántos ${hood.symbol} querés gastar?`);
+  lines.push("", `How much ${hood.symbol} do you want to spend?`);
 
   const options = {
     ...HTML,
-    reply_markup: tokenPanelKeyboard(token.address, settings.buyAmounts),
+    reply_markup: tokenPanelKeyboard(token.address, settings.buyAmounts, hood.symbol),
   };
   if (edit) {
     await ctx.editMessageText(lines.join("\n"), options);
@@ -235,7 +236,7 @@ async function renderTokenPanel(ctx, tokenAddress, { edit = false } = {}) {
 }
 
 bot.callbackQuery(/^r:(0x[0-9a-fA-F]{40})$/, async (ctx) => {
-  await ctx.answerCallbackQuery({ text: "Actualizando…" });
+  await ctx.answerCallbackQuery({ text: "Refreshing…" });
   try {
     await renderTokenPanel(ctx, ctx.match[1], { edit: true });
   } catch (err) {
@@ -245,12 +246,12 @@ bot.callbackQuery(/^r:(0x[0-9a-fA-F]{40})$/, async (ctx) => {
   }
 });
 
-// ---------- Comprar ----------
+// ---------- Buy ----------
 
 bot.callbackQuery(/^b:x:(0x[0-9a-fA-F]{40})$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   pending.set(ctx.from.id, { type: "customBuy", token: ctx.match[1] });
-  await ctx.reply("🔢 ¿Cuántos HOOD querés gastar? Mandame solo el número.");
+  await ctx.reply("🔢 How much WETH do you want to spend? Send just the number.");
 });
 
 bot.callbackQuery(/^b:([0-9]*\.?[0-9]+):(0x[0-9a-fA-F]{40})$/, async (ctx) => {
@@ -261,7 +262,7 @@ bot.callbackQuery(/^b:([0-9]*\.?[0-9]+):(0x[0-9a-fA-F]{40})$/, async (ctx) => {
 async function executeBuy(ctx, tokenAddress, hoodAmountText) {
   const userId = ctx.from.id;
   if (!wallets.hasWallet(userId)) {
-    await ctx.reply("⚠️ Primero creá o importá una billetera (/start).");
+    await ctx.reply("⚠️ First create or import a wallet (/start).");
     return;
   }
   const { settings } = getUser(userId);
@@ -269,18 +270,18 @@ async function executeBuy(ctx, tokenAddress, hoodAmountText) {
   try {
     const [hood, token] = await Promise.all([hoodInfo(), getTokenInfo(tokenAddress)]);
     const amountIn = parseUnits(hoodAmountText, hood.decimals);
-    if (amountIn <= 0n) throw new Error("El monto tiene que ser mayor a 0.");
+    if (amountIn <= 0n) throw new Error("The amount must be greater than 0.");
 
     const signer = wallets.getSigner(userId, provider);
     const balance = await erc20(config.hoodToken).balanceOf(signer.address);
     if (balance < amountIn) {
       throw new Error(
-        `Saldo insuficiente: tenés ${fmt(balance, hood.decimals)} ${hood.symbol} y querés gastar ${hoodAmountText}.`
+        `Insufficient balance: you have ${fmt(balance, hood.decimals)} ${hood.symbol} and want to spend ${hoodAmountText}.`
       );
     }
 
     status = await ctx.reply(
-      `⏳ Comprando ${token.symbol} con ${hoodAmountText} ${hood.symbol}…`
+      `⏳ Buying ${token.symbol} with ${hoodAmountText} ${hood.symbol}…`
     );
     const result = await swap(signer, config.hoodToken, tokenAddress, amountIn, settings.slippageBps);
 
@@ -288,16 +289,16 @@ async function executeBuy(ctx, tokenAddress, hoodAmountText) {
       status.chat.id,
       status.message_id,
       [
-        `✅ <b>Compra ejecutada</b>`,
+        `✅ <b>Buy executed</b>`,
         "",
-        `🟢 Gastaste: <b>${hoodAmountText} ${hood.symbol}</b>`,
-        `📦 Mínimo garantizado: <b>${fmt(result.amountOutMin, token.decimals)} ${token.symbol}</b>`,
-        `🔗 <a href="${txLink(result.txHash)}">Ver transacción</a>`,
+        `🟢 Spent: <b>${hoodAmountText} ${hood.symbol}</b>`,
+        `📦 Guaranteed minimum: <b>${fmt(result.amountOutMin, token.decimals)} ${token.symbol}</b>`,
+        `🔗 <a href="${txLink(result.txHash)}">View transaction</a>`,
       ].join("\n"),
       HTML
     );
   } catch (err) {
-    const message = `❌ Compra fallida: ${err.shortMessage ?? err.message}`;
+    const message = `❌ Buy failed: ${err.shortMessage ?? err.message}`;
     if (status) {
       await ctx.api.editMessageText(status.chat.id, status.message_id, message);
     } else {
@@ -306,7 +307,7 @@ async function executeBuy(ctx, tokenAddress, hoodAmountText) {
   }
 }
 
-// ---------- Vender ----------
+// ---------- Sell ----------
 
 bot.callbackQuery(/^s:(25|50|100):(0x[0-9a-fA-F]{40})$/, async (ctx) => {
   await ctx.answerCallbackQuery();
@@ -314,7 +315,7 @@ bot.callbackQuery(/^s:(25|50|100):(0x[0-9a-fA-F]{40})$/, async (ctx) => {
   const tokenAddress = ctx.match[2];
   const userId = ctx.from.id;
   if (!wallets.hasWallet(userId)) {
-    await ctx.reply("⚠️ Primero creá o importá una billetera (/start).");
+    await ctx.reply("⚠️ First create or import a wallet (/start).");
     return;
   }
   const { settings } = getUser(userId);
@@ -324,25 +325,25 @@ bot.callbackQuery(/^s:(25|50|100):(0x[0-9a-fA-F]{40})$/, async (ctx) => {
     const signer = wallets.getSigner(userId, provider);
     const balance = await erc20(tokenAddress).balanceOf(signer.address);
     const amountIn = (balance * percent) / 100n;
-    if (amountIn <= 0n) throw new Error(`No tenés ${token.symbol} para vender.`);
+    if (amountIn <= 0n) throw new Error(`You don't have any ${token.symbol} to sell.`);
 
-    status = await ctx.reply(`⏳ Vendiendo ${percent}% de tus ${token.symbol}…`);
+    status = await ctx.reply(`⏳ Selling ${percent}% of your ${token.symbol}…`);
     const result = await swap(signer, tokenAddress, config.hoodToken, amountIn, settings.slippageBps);
 
     await ctx.api.editMessageText(
       status.chat.id,
       status.message_id,
       [
-        `✅ <b>Venta ejecutada</b>`,
+        `✅ <b>Sell executed</b>`,
         "",
-        `🔴 Vendiste: <b>${fmt(amountIn, token.decimals)} ${token.symbol}</b> (${percent}%)`,
-        `🪙 Mínimo garantizado: <b>${fmt(result.amountOutMin, hood.decimals)} ${hood.symbol}</b>`,
-        `🔗 <a href="${txLink(result.txHash)}">Ver transacción</a>`,
+        `🔴 Sold: <b>${fmt(amountIn, token.decimals)} ${token.symbol}</b> (${percent}%)`,
+        `🪙 Guaranteed minimum: <b>${fmt(result.amountOutMin, hood.decimals)} ${hood.symbol}</b>`,
+        `🔗 <a href="${txLink(result.txHash)}">View transaction</a>`,
       ].join("\n"),
       HTML
     );
   } catch (err) {
-    const message = `❌ Venta fallida: ${err.shortMessage ?? err.message}`;
+    const message = `❌ Sell failed: ${err.shortMessage ?? err.message}`;
     if (status) {
       await ctx.api.editMessageText(status.chat.id, status.message_id, message);
     } else {
@@ -351,7 +352,7 @@ bot.callbackQuery(/^s:(25|50|100):(0x[0-9a-fA-F]{40})$/, async (ctx) => {
   }
 });
 
-// ---------- Texto libre: CAs y respuestas pendientes ----------
+// ---------- Free text: CAs and pending replies ----------
 
 bot.on("message:text", async (ctx) => {
   const userId = ctx.from.id;
@@ -362,10 +363,10 @@ bot.on("message:text", async (ctx) => {
     pending.delete(userId);
     switch (waiting.type) {
       case "confirmCreate": {
-        if (text.toUpperCase() === "SI" || text.toUpperCase() === "SÍ") {
+        if (text.trim().toUpperCase() === "YES") {
           await doCreateWallet(ctx);
         } else {
-          await ctx.reply("👍 Cancelado, tu billetera actual sigue intacta.");
+          await ctx.reply("👍 Cancelled, your current wallet is untouched.");
         }
         return;
       }
@@ -373,17 +374,17 @@ bot.on("message:text", async (ctx) => {
         try {
           const { address } = wallets.importWallet(userId, text);
           await ctx.reply(
-            `✅ Billetera importada: <code>${address}</code>\n\n⚠️ Borrá tu mensaje con la clave privada.`,
+            `✅ Wallet imported: <code>${address}</code>\n\n⚠️ Delete your message containing the private key.`,
             { ...HTML, reply_markup: mainMenuKeyboard(true) }
           );
         } catch {
-          await ctx.reply("❌ Esa clave privada no es válida. Probá de nuevo desde el menú.");
+          await ctx.reply("❌ That private key is not valid. Try again from the menu.");
         }
         return;
       }
       case "customBuy": {
         if (!/^[0-9]*\.?[0-9]+$/.test(text)) {
-          await ctx.reply("❌ Mandame solo un número (ej: 25 o 12.5).");
+          await ctx.reply("❌ Send just a number (e.g. 0.05 or 0.1).");
           return;
         }
         await executeBuy(ctx, waiting.token, text);
@@ -392,13 +393,13 @@ bot.on("message:text", async (ctx) => {
       case "slippage": {
         const value = Number(text.replace(",", "."));
         if (!Number.isFinite(value) || value <= 0 || value > 50) {
-          await ctx.reply("❌ Slippage inválido. Usá un número entre 0.1 y 50.");
+          await ctx.reply("❌ Invalid slippage. Use a number between 0.1 and 50.");
           return;
         }
         updateUser(userId, (u) => {
           u.settings.slippageBps = Math.round(value * 100);
         });
-        await ctx.reply(`✅ Slippage configurado en ${value}%.`);
+        await ctx.reply(`✅ Slippage set to ${value}%.`);
         return;
       }
       case "amounts": {
@@ -408,27 +409,27 @@ bot.on("message:text", async (ctx) => {
           .filter((s) => /^[0-9]*\.?[0-9]+$/.test(s) && Number(s) > 0)
           .slice(0, 6);
         if (!amounts.length) {
-          await ctx.reply("❌ No entendí los montos. Ejemplo: <code>10,50,100,500</code>", HTML);
+          await ctx.reply("❌ I didn't understand the amounts. Example: <code>0.01,0.05,0.1,0.5</code>", HTML);
           return;
         }
         updateUser(userId, (u) => {
           u.settings.buyAmounts = amounts;
         });
-        await ctx.reply(`✅ Montos de compra: ${amounts.join(", ")} HOOD.`);
+        await ctx.reply(`✅ Buy amounts: ${amounts.join(", ")} WETH.`);
         return;
       }
     }
   }
 
-  // ¿Es un contract address?
+  // Is it a contract address?
   const address = normalizeAddress(text);
   if (address) {
     try {
-      // Acepta tanto el CA del token como el de un pool (lo resuelve al token).
+      // Accepts both a token CA and a pool CA (resolves it to the token).
       const resolved = await resolveTradeToken(address);
       if (resolved.fromPool) {
         await ctx.reply(
-          `🔎 Detecté que pegaste un <b>pool</b>. El token es <code>${resolved.address}</code>`,
+          `🔎 Detected that you pasted a <b>pool</b>. The token is <code>${resolved.address}</code>`,
           HTML
         );
       }
@@ -440,18 +441,18 @@ bot.on("message:text", async (ctx) => {
   }
 
   await ctx.reply(
-    "🤔 No entendí. Pegá el <b>CA de un token</b> (0x…) para comprar, o usá /start para el menú.",
+    "🤔 I didn't understand. Paste a <b>token CA</b> (0x…) to buy, or use /start for the menu.",
     HTML
   );
 });
 
-// ---------- Arranque ----------
+// ---------- Startup ----------
 
 bot.catch((err) => {
-  console.error("Error no manejado:", err.error ?? err);
+  console.error("Unhandled error:", err.error ?? err);
 });
 
-console.log(`HOOD Bot arrancando — red ${config.chainId} (${config.rpcUrl})`);
+console.log(`HOOD Bot starting — network ${config.chainId} (${config.rpcUrl})`);
 bot.start({
-  onStart: (me) => console.log(`Bot conectado como @${me.username}`),
+  onStart: (me) => console.log(`Bot connected as @${me.username}`),
 });

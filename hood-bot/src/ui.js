@@ -3,25 +3,25 @@ import { config } from "./config.js";
 
 export function mainMenuText(address) {
   return [
-    "🤖 <b>HOOD Bot</b> — trading en Robinhood Chain",
+    "🤖 <b>HOOD Bot</b> — trading on Robinhood Chain",
     "",
     address
-      ? `💼 Billetera: <code>${address}</code>`
-      : "💼 Todavía no tenés billetera. Creá una o importá la tuya.",
+      ? `💼 Wallet: <code>${address}</code>`
+      : "💼 You don't have a wallet yet. Create one or import yours.",
     "",
-    "📥 <b>Pegá el CA (contract address) de un token</b> y te muestro las opciones de compra con HOOD, al estilo Trojan.",
+    "📥 <b>Paste the CA (contract address) of a token</b> and I'll show you the buy options.",
   ].join("\n");
 }
 
 export function mainMenuKeyboard(hasWallet) {
   const kb = new InlineKeyboard();
   if (hasWallet) {
-    kb.text("💼 Billetera", "menu:wallet").text("⚙️ Ajustes", "menu:settings");
+    kb.text("💼 Wallet", "menu:wallet").text("⚙️ Settings", "menu:settings");
   } else {
-    kb.text("🆕 Crear billetera", "w:create")
-      .text("📥 Importar", "w:import")
+    kb.text("🆕 Create wallet", "w:create")
+      .text("📥 Import", "w:import")
       .row()
-      .text("⚙️ Ajustes", "menu:settings");
+      .text("⚙️ Settings", "menu:settings");
   }
   return kb;
 }
@@ -29,45 +29,45 @@ export function mainMenuKeyboard(hasWallet) {
 export function walletMenuKeyboard() {
   return new InlineKeyboard()
     .text("💰 Balance", "w:balance")
-    .text("🔑 Exportar clave", "w:export")
+    .text("🔑 Export key", "w:export")
     .row()
-    .text("📥 Importar otra", "w:import")
-    .text("🆕 Crear nueva", "w:create")
+    .text("📥 Import another", "w:import")
+    .text("🆕 Create new", "w:create")
     .row()
-    .text("🏠 Menú", "menu:main");
+    .text("🏠 Menu", "menu:main");
 }
 
-export function settingsText(settings) {
+export function settingsText(settings, baseSymbol = "WETH") {
   return [
-    "⚙️ <b>Ajustes</b>",
+    "⚙️ <b>Settings</b>",
     "",
     `📉 Slippage: <b>${(settings.slippageBps / 100).toFixed(2)}%</b>`,
-    `💵 Montos de compra (HOOD): <b>${settings.buyAmounts.join(", ")}</b>`,
+    `💵 Buy amounts (${baseSymbol}): <b>${settings.buyAmounts.join(", ")}</b>`,
   ].join("\n");
 }
 
 export function settingsKeyboard() {
   return new InlineKeyboard()
-    .text("📉 Cambiar slippage", "set:slip")
+    .text("📉 Change slippage", "set:slip")
     .row()
-    .text("💵 Cambiar montos", "set:amounts")
+    .text("💵 Change amounts", "set:amounts")
     .row()
-    .text("🏠 Menú", "menu:main");
+    .text("🏠 Menu", "menu:main");
 }
 
-export function tokenPanelKeyboard(tokenAddress, buyAmounts) {
+export function tokenPanelKeyboard(tokenAddress, buyAmounts, baseSymbol = "WETH") {
   const kb = new InlineKeyboard();
   buyAmounts.forEach((amount, i) => {
-    kb.text(`🟢 ${amount} HOOD`, `b:${amount}:${tokenAddress}`);
+    kb.text(`🟢 ${amount} ${baseSymbol}`, `b:${amount}:${tokenAddress}`);
     if (i % 2 === 1) kb.row();
   });
   if (buyAmounts.length % 2 === 1) kb.row();
-  kb.text("🔢 Otro monto", `b:x:${tokenAddress}`).row();
-  kb.text("🔴 Vender 25%", `s:25:${tokenAddress}`)
+  kb.text("🔢 Custom amount", `b:x:${tokenAddress}`).row();
+  kb.text("🔴 Sell 25%", `s:25:${tokenAddress}`)
     .text("🔴 50%", `s:50:${tokenAddress}`)
     .text("🔴 100%", `s:100:${tokenAddress}`)
     .row();
-  kb.text("🔄 Refrescar", `r:${tokenAddress}`).text("🏠 Menú", "menu:main");
+  kb.text("🔄 Refresh", `r:${tokenAddress}`).text("🏠 Menu", "menu:main");
   return kb;
 }
 
