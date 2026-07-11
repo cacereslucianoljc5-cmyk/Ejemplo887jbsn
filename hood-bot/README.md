@@ -53,6 +53,22 @@ Robinhood Chain es una red muy nueva, así que **verificá siempre las direccion
 
 ⚠️ No copies direcciones de mensajes de Telegram/Twitter: es el vector de scam más común.
 
+### Nota sobre la moneda base (HOOD vs WETH)
+
+En Robinhood Chain **no existe un token "HOOD" canónico**: hay decenas de memecoins con ese
+símbolo, ninguno oficial, y Robinhood no tokenizó su propia acción en la red. El gas es **ETH**
+y **todas las pools de Uniswap se cotizan contra WETH**. Por eso, igual que en Trojan (Solana)
+gastás SOL —la moneda nativa—, acá lo funcional es usar **WETH** como moneda base
+(`HOOD_TOKEN_ADDRESS` = dirección de WETH). Así el bot puede comprar cualquier CA que pegues,
+ruteando `WETH → token` directo. Si querés usar un memecoin HOOD específico como moneda de
+gasto, cambiá `HOOD_TOKEN_ADDRESS` por su CA (necesitará liquidez HOOD/WETH para rutear).
+
+Direcciones ya verificadas en mainnet (chain 4663):
+
+- **WETH / base** = `0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73`
+- **UniswapV2Router02** = `0x89e5DB8B5aA49aA85AC63f691524311AEB649eba`
+  (validado on-chain: su `WETH()` y `factory()` coinciden con los docs de Uniswap)
+
 ## Uso
 
 | Acción | Cómo |

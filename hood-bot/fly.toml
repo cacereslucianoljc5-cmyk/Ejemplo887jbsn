@@ -9,7 +9,7 @@
 #   fly deploy
 
 app = "hood-bot"
-primary_region = "eze"
+primary_region = "gru"
 
 [build]
   dockerfile = "Dockerfile"
@@ -27,4 +27,4 @@ primary_region = "eze"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "256mb"
+  memory = "512mb"
