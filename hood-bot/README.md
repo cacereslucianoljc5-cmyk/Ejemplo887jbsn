@@ -9,7 +9,10 @@ Bot de Telegram **estilo Trojan** para operar en **Robinhood Chain** (la L2 de R
 
 ## Cómo funciona el swap
 
-- La compra hace `HOOD → token` (y la venta `token → HOOD`) usando un router **estilo Uniswap V2** (`swapExactTokensForTokensSupportingFeeOnTransferTokens`), probando la ruta directa y la ruta vía WETH, y eligiendo la que da mejor precio.
+- La compra hace `HOOD → token` (y la venta `token → HOOD`) cotizando **en paralelo por Uniswap V2 y V3** y ejecutando por la que da mejor precio:
+  - **V2**: `swapExactTokensForTokensSupportingFeeOnTransferTokens` (ruta directa o vía WETH).
+  - **V3**: `exactInputSingle` sobre `SwapRouter02`, probando los fee tiers 0.01/0.05/0.3/1 % (`QuoterV2` para cotizar). Muchos tokens de la red tienen liquidez **solo en V3**, así que esto es clave para poder comprarlos.
+- Si pegás la dirección de un **pool** (lo que copiás de DEX Screener) en vez del token, el bot lo **resuelve al token subyacente** automáticamente.
 - Protección de **slippage** configurable por usuario (default 1 %).
 - El **gas de Robinhood Chain se paga en ETH**, así que la billetera necesita un poco de ETH además de los HOOD.
 
