@@ -7,6 +7,7 @@ import {
   erc20,
   normalizeAddress,
   getTokenInfo,
+  resolveTradeToken,
   getBalances,
   bestQuote,
   swap,
@@ -190,8 +191,13 @@ async function renderTokenPanel(ctx, tokenAddress, { edit = false } = {}) {
   try {
     const oneHood = parseUnits("1", hood.decimals);
     const q = await bestQuote(config.hoodToken, tokenAddress, oneHood);
-    const route = q.path.length === 2 ? "directa" : "vía WETH";
-    priceLine = `💱 1 ${hood.symbol} ≈ <b>${fmt(q.amountOut, token.decimals)} ${token.symbol}</b> (ruta ${route})`;
+    const route =
+      q.kind === "v3"
+        ? `Uniswap V3 · ${q.fee / 10000}%`
+        : q.path.length === 2
+          ? "Uniswap V2"
+          : "Uniswap V2 · vía WETH";
+    priceLine = `💱 1 ${hood.symbol} ≈ <b>${fmt(q.amountOut, token.decimals)} ${token.symbol}</b> (${route})`;
   } catch {
     // Se muestra "sin liquidez"; los botones de compra igual validan al ejecutar.
   }
@@ -418,11 +424,17 @@ bot.on("message:text", async (ctx) => {
   const address = normalizeAddress(text);
   if (address) {
     try {
-      await renderTokenPanel(ctx, address);
+      // Acepta tanto el CA del token como el de un pool (lo resuelve al token).
+      const resolved = await resolveTradeToken(address);
+      if (resolved.fromPool) {
+        await ctx.reply(
+          `🔎 Detecté que pegaste un <b>pool</b>. El token es <code>${resolved.address}</code>`,
+          HTML
+        );
+      }
+      await renderTokenPanel(ctx, resolved.address);
     } catch (err) {
-      await ctx.reply(
-        `❌ No pude leer ese contrato como token ERC-20: ${err.shortMessage ?? err.message}`
-      );
+      await ctx.reply(`❌ ${err.shortMessage ?? err.message}`);
     }
     return;
   }
