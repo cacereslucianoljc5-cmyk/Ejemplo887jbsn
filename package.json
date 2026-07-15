@@ -1,8 +1,8 @@
 {
-  "name": "animator-glb",
+  "name": "fledge",
   "private": true,
   "version": "1.0.0",
-  "description": "Visualizador interactivo que aplica automáticamente un paquete grande de animaciones a cualquier modelo GLB humanoide (retargeting automático de esqueleto)",
+  "description": "Fledge — the token launchpad on Robinhood Chain. Every launch takes flight.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,10 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.182.0"
+    "gsap": "^3.12.5",
+    "iconoir-react": "^7.10.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
     "playwright": "^1.61.1",
-    "vite": "^7.1.5"
+    "vite": "^5.4.11"
   }
 }
