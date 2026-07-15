@@ -141,7 +141,7 @@ function Hero() {
         <div className="hero-visual" data-anim>
           <div className="token-card tc-main">
             <div className="tc-head">
-              <div className="tc-avatar"><Rocket /></div>
+              <img className="tc-avatar" src={`${import.meta.env.BASE_URL}tokens/QUILL.png`} alt="Quill logo" width={52} height={52} />
               <div>
                 <div className="tc-name">Quill</div>
                 <div className="tc-ticker">$QUILL · Robinhood Chain</div>
@@ -207,7 +207,7 @@ function Board() {
           {list.map((tok) => (
             <article className="tcard" key={tok.tk} data-anim>
               <div className="tcard-top">
-                <div className="tcard-av" style={{ background: tok.col, color: tok.col === '#0B0B0C' ? '#CCFF01' : '#0B0B0C' }}>{tok.i}</div>
+                <img className="tcard-av" src={`${import.meta.env.BASE_URL}tokens/${tok.tk}.png`} alt={`${tok.nm} logo`} loading="lazy" width={46} height={46} />
                 <div>
                   <div className="tcard-nm">{tok.nm}</div>
                   <div className="tcard-tk">${tok.tk}</div>
