@@ -1,0 +1,80 @@
+/* ==========================================================================
+   enhance.css — styles for the library components integrated via crear-paginas
+   (Magic UI Marquee / NumberTicker / BorderBeam, React Bits BlurText,
+    Cursify SpotlightCursor). Coexists with index.css; no Tailwind.
+   ========================================================================== */
+
+/* ---- Magic UI: Marquee ---- */
+.mq {
+  display: flex;
+  overflow: hidden;
+  --duration: 40s;
+  --gap: 2.4rem;
+  gap: var(--gap);
+}
+.mq-h { flex-direction: row; }
+/* keep the dark ticker bar's original vertical rhythm */
+.ticker .mq { padding: 15px 0; --gap: 46px; }
+.mq-row { display: flex; flex-shrink: 0; justify-content: space-around; gap: var(--gap); }
+.mq-row-h { flex-direction: row; animation: mq-scroll var(--duration) linear infinite; }
+.mq-reverse { animation-direction: reverse; }
+.mq-pause:hover .mq-row { animation-play-state: paused; }
+@keyframes mq-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(calc(-100% - var(--gap))); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mq-row-h { animation: none; }
+}
+
+/* ---- Magic UI: NumberTicker ---- */
+.num-ticker {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ---- Magic UI: BorderBeam ---- */
+.border-beam-wrap {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: var(--border-beam-width, 1.5px) solid transparent;
+  -webkit-mask: linear-gradient(transparent, transparent), linear-gradient(#000, #000);
+  mask: linear-gradient(transparent, transparent), linear-gradient(#000, #000);
+  -webkit-mask-clip: padding-box, border-box;
+  mask-clip: padding-box, border-box;
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.border-beam {
+  position: absolute;
+  aspect-ratio: 1 / 1;
+  border-radius: 999px;
+  filter: drop-shadow(0 0 6px rgba(204, 255, 1, 0.6));
+}
+
+/* ---- React Bits: BlurText ---- */
+.blur-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.blur-text.hero-blur { align-items: flex-start; }
+/* highlight the final word ("flight.") in lime */
+.hero-blur .blur-word:last-child { color: var(--lime); }
+
+/* ---- Cursify: SpotlightCursor (light-theme adaptation) ---- */
+.spotlight-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 45;
+}
+@media (pointer: coarse) {
+  .spotlight-cursor { display: none; }
+}

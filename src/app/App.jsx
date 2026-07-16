@@ -7,6 +7,11 @@ import {
   OpenNewWindow, WarningTriangle, Xmark, Globe,
 } from 'iconoir-react';
 import Logo, { Mark } from './Logo.jsx';
+import { Marquee } from './components/Marquee.jsx';
+import { NumberTicker } from './components/NumberTicker.jsx';
+import { BorderBeam } from './components/BorderBeam.jsx';
+import { BlurText } from './components/BlurText.jsx';
+import SpotlightCursor from './components/SpotlightCursor.jsx';
 import { useReveal } from './useReveal.js';
 import { WalletProvider, useWallet } from './wallet.jsx';
 import { CreateModal, PortfolioModal } from './Modals.jsx';
@@ -78,10 +83,10 @@ const CURVE_LI = [
 ];
 
 const STATS = [
-  { v: '31,204', k: 'Tokens fledged' },
-  { v: '$182', u: 'M', k: 'Lifetime volume' },
-  { v: '9.9', u: ' ETH', k: 'Graduation threshold' },
-  { v: '$0.003', k: 'Avg. gas per trade' },
+  { pre: '', value: 31204, dec: 0, u: '', k: 'Tokens fledged' },
+  { pre: '$', value: 182, dec: 0, u: 'M', k: 'Lifetime volume' },
+  { pre: '', value: 9.9, dec: 1, u: ' ETH', k: 'Graduation threshold' },
+  { pre: '$', value: 0.003, dec: 3, u: '', k: 'Avg. gas per trade' },
 ];
 
 const FAQ = [
@@ -153,8 +158,7 @@ function Hero() {
         <div className="hero-copy">
           <span className="hero-badge" data-anim><b>★</b> #1 Launchpad on Robinhood Chain</span>
           <h1 className="h-mega" style={{ marginTop: 22 }}>
-            <span data-anim style={{ display: 'block' }}>Every launch</span>
-            <span data-anim style={{ display: 'block' }}>takes <span className="hl">flight.</span></span>
+            <BlurText text="Every launch takes flight." className="hero-blur" animateBy="words" delay={140} stepDuration={0.4} />
           </h1>
           <p className="lead" data-anim>
             Create a token in seconds. It trades instantly on a bonding curve and
@@ -174,6 +178,7 @@ function Hero() {
 
         <div className="hero-visual" data-anim>
           <div className="token-card tc-main">
+            <BorderBeam size={70} duration={7} />
             <div className="tc-head">
               <img className="tc-avatar" src={localLogo('QUILL')} onError={(e) => logoFallback(e, 'QUILL')} alt="Quill logo" width={52} height={52} />
               <div>
@@ -192,11 +197,11 @@ function Hero() {
           </div>
           <div className="token-card tc-mini tc-a">
             <div className="lbl">Market cap</div>
-            <div className="val">$1.9M</div>
+            <div className="val">$<NumberTicker value={1.9} decimalPlaces={1} />M</div>
           </div>
           <div className="token-card tc-mini tc-b">
             <div className="lbl">Holders</div>
-            <div className="val">5,210</div>
+            <div className="val"><NumberTicker value={5210} /></div>
           </div>
         </div>
       </div>
@@ -205,17 +210,16 @@ function Hero() {
 }
 
 function Ticker() {
-  const items = [...TICKER, ...TICKER];
   return (
     <div className="ticker" aria-hidden="true">
-      <div className="ticker-track">
-        {items.map((t, i) => (
+      <Marquee className="ticker-mq" pauseOnHover repeat={4}>
+        {TICKER.map((t, i) => (
           <span className="ticker-item" key={i}>
             <Spark width={16} height={16} color="#CCFF01" />
             <b>${t.n}</b> <span className="up">{t.c}</span>
           </span>
         ))}
-      </div>
+      </Marquee>
     </div>
   );
 }
@@ -422,7 +426,10 @@ function Stats() {
         <div className="stats-grid">
           {STATS.map((s) => (
             <div className="stat" key={s.k} data-anim>
-              <div className="v">{s.v}{s.u && <span className="u">{s.u}</span>}</div>
+              <div className="v">
+                {s.pre}<NumberTicker value={s.value} decimalPlaces={s.dec} />
+                {s.u && <span className="u">{s.u}</span>}
+              </div>
               <div className="k">{s.k}</div>
             </div>
           ))}
@@ -504,6 +511,7 @@ function CTA() {
     <section className="section" style={{ paddingTop: 0 }}>
       <div className="container">
         <div className="cta-box" data-anim>
+          <BorderBeam size={90} duration={9} borderWidth={2} />
           <div className="glow" />
           <h2 className="h-mega" style={{ fontSize: 'clamp(40px, 7vw, 92px)' }}>Give it wings.</h2>
           <p className="lead">Your token is one click from the chain. Launch it on Robinhood Chain and watch it fledge.</p>
@@ -565,6 +573,7 @@ function AppInner() {
   };
   return (
     <UI.Provider value={ui}>
+      <SpotlightCursor />
       <div ref={scope}>
         <Nav />
         <Hero />
