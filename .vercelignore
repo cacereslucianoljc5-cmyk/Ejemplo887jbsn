@@ -1,0 +1,14 @@
+node_modules
+.git
+docs
+stock-machine
+public/models
+public/anims
+scripts
+contracts
+src/main.js
+src/autorig.js
+src/cmu.js
+src/packs.js
+src/projects.js
+src/retarget.js
