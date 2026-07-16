@@ -1,12 +1,22 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   Rocket, Wallet, Coins, Sparks, GraphUp, StatUp, ArrowRight, ArrowUpRight,
   FastArrowRight, DataTransferBoth, RefreshDouble, Trophy, Flash, ShieldCheck,
-  Plus, Timer, Lock, Leaf, SeaWaves, Community, Percentage, EvChargeAlt,
+  Plus, Timer, Lock, Leaf, Community, Percentage, EvChargeAlt,
   Twitter, Discord, Book, NavArrowDown, DollarCircle, Cube, Spark,
+  OpenNewWindow, WarningTriangle, Xmark, Globe,
 } from 'iconoir-react';
 import Logo, { Mark } from './Logo.jsx';
 import { useReveal } from './useReveal.js';
+import { WalletProvider, useWallet } from './wallet.jsx';
+import { CreateModal, PortfolioModal } from './Modals.jsx';
+import { useLiveChain } from './hooks.js';
+import { BRIDGE_URL, DOCS_URL, EXPLORER, shortAddr } from './chain.js';
+import { localLogo, logoFallback } from './tokenArt.js';
+
+// lightweight UI action context (open modals, external links)
+const UI = createContext({ openCreate() {}, openPortfolio() {} });
+const useUI = () => useContext(UI);
 
 /* ---------------- data ---------------- */
 const NAV = ['Board', 'Create', 'Bridge', 'Portfolio', 'Docs', 'FAQ'];
@@ -79,7 +89,7 @@ const FAQ = [
   { q: 'What is a bonding curve?', a: 'A bonding curve is an automated market that prices a token purely from supply. Each purchase moves the price up along the curve and each sale moves it down, so there is always liquidity and always a fair, transparent price — no order book, no market maker needed.' },
   { q: 'What does "graduating at 9.9 ETH" mean?', a: 'When a token accumulates 9.9 ETH of liquidity on its curve, Fledge automatically deploys it to the DEX and locks the liquidity. The token has "fledged" — it now trades on the open market with a protected pool.' },
   { q: 'Why Robinhood Chain and not mainnet?', a: 'Robinhood Chain is an Ethereum EVM L2. You get the same wallets, the same tooling and the same security assumptions as Ethereum, but gas is a fraction of a cent and confirmation is near-instant — which is exactly what a launchpad needs.' },
-  { q: 'How does the bridge work?', a: 'Fledge bridges assets between Robinhood EVM L2 and Solana. Move ETH, USDC or USDT across in a couple of clicks so you can fund your wallet from wherever your liquidity already lives.' },
+  { q: 'How does the bridge work?', a: 'Robinhood Chain is an Arbitrum L2, so you move funds with the canonical Ethereum ⇄ Robinhood Chain bridge (or a partner route). Bring ETH, USDC or USDT over from Ethereum and start launching — the Bridge button opens the official portal.' },
   { q: 'What can I pay with?', a: 'Everything settles on Robinhood Chain. You trade and launch with ETH, USDC or USDT held on the Robinhood EVM L2 — the cheapest way to move on the network.' },
 ];
 
@@ -88,23 +98,45 @@ const ASSETS = ['ETH', 'USDC', 'USDT'];
 /* ---------------- sections ---------------- */
 function Nav() {
   const [scrolled, setScrolled] = useState(false);
+  const w = useWallet();
+  const ui = useUI();
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 12);
     on();
     window.addEventListener('scroll', on, { passive: true });
     return () => window.removeEventListener('scroll', on);
   }, []);
+  const go = (label) => {
+    if (label === 'Create') ui.openCreate();
+    else if (label === 'Portfolio') ui.openPortfolio();
+    else if (label === 'Docs') window.open(DOCS_URL, '_blank', 'noopener');
+    else document.getElementById(label.toLowerCase())?.scrollIntoView({ behavior: 'smooth' });
+  };
   return (
     <nav className={`nav ${scrolled ? 'scrolled' : ''}`}>
       <div className="container nav-inner">
-        <Logo />
+        <a href="#top" aria-label="Fledge home"><Logo /></a>
         <div className="nav-links">
-          {NAV.map((l) => <a key={l} href={`#${l.toLowerCase()}`}>{l}</a>)}
+          {NAV.map((l) => <button key={l} className="navlink" onClick={() => go(l)}>{l}</button>)}
         </div>
         <div className="nav-cta">
-          <button className="btn btn-primary" style={{ padding: '11px 20px', fontSize: 15 }}>
-            <Wallet /> Connect Wallet
-          </button>
+          {w.address ? (
+            <>
+              {w.wrongNetwork && (
+                <button className="net-warn" onClick={w.ensureChain} title="Switch to Robinhood Chain">
+                  <WarningTriangle /> Wrong network
+                </button>
+              )}
+              <button className="wallet-chip" onClick={ui.openPortfolio}>
+                <span className="wc-dot" />
+                {w.balance != null ? `${Number(w.balance).toFixed(3)} ETH · ` : ''}{shortAddr(w.address)}
+              </button>
+            </>
+          ) : (
+            <button className="btn btn-primary" style={{ padding: '11px 20px', fontSize: 15 }} onClick={w.connect} disabled={w.connecting}>
+              <Wallet /> {w.connecting ? 'Connecting…' : 'Connect Wallet'}
+            </button>
+          )}
         </div>
       </div>
     </nav>
@@ -112,6 +144,8 @@ function Nav() {
 }
 
 function Hero() {
+  const ui = useUI();
+  const toBoard = () => document.getElementById('board')?.scrollIntoView({ behavior: 'smooth' });
   return (
     <header className="hero" id="top">
       <div className="hero-grid" />
@@ -128,12 +162,12 @@ function Hero() {
             Robinhood’s EVM L2, where gas is a rounding error.
           </p>
           <div className="hero-cta">
-            <button className="btn btn-primary btn-lg" data-anim><Rocket /> Launch a token</button>
-            <button className="btn btn-ghost btn-lg" data-anim><GraphUp /> Explore the board</button>
+            <button className="btn btn-primary btn-lg" data-anim onClick={ui.openCreate}><Rocket /> Launch a token</button>
+            <button className="btn btn-ghost btn-lg" data-anim onClick={toBoard}><GraphUp /> Explore the board</button>
           </div>
           <div className="hero-chips">
             <span className="pill" data-anim><Cube /> Robinhood EVM L2</span>
-            <span className="pill" data-anim><DataTransferBoth /> Solana bridge</span>
+            <span className="pill" data-anim><DataTransferBoth /> Ethereum ⇄ L2 bridge</span>
             <span className="pill" data-anim><DollarCircle /> ETH · USDC · USDT</span>
           </div>
         </div>
@@ -141,7 +175,7 @@ function Hero() {
         <div className="hero-visual" data-anim>
           <div className="token-card tc-main">
             <div className="tc-head">
-              <img className="tc-avatar" src={`${import.meta.env.BASE_URL}tokens/QUILL.png`} alt="Quill logo" width={52} height={52} />
+              <img className="tc-avatar" src={localLogo('QUILL')} onError={(e) => logoFallback(e, 'QUILL')} alt="Quill logo" width={52} height={52} />
               <div>
                 <div className="tc-name">Quill</div>
                 <div className="tc-ticker">$QUILL · Robinhood Chain</div>
@@ -189,6 +223,7 @@ function Ticker() {
 function Board() {
   const [tab, setTab] = useState(TABS[0]);
   const list = TOKENS[tab];
+  const live = useLiveChain();
   return (
     <section className="section" id="board">
       <div className="container">
@@ -196,6 +231,15 @@ function Board() {
         <h2 className="h1" style={{ marginTop: 16, maxWidth: '16ch' }} data-anim>
           Watch every drop go live.
         </h2>
+        <div className="live-strip" data-anim>
+          <span className={`live-dot ${live.ok ? 'on' : ''}`} />
+          <b>Robinhood Chain</b>
+          <span>·</span>
+          <span>{live.block != null ? `block #${live.block.toLocaleString()}` : 'connecting…'}</span>
+          <span>·</span>
+          <span>gas {live.gwei != null ? `${live.gwei} gwei` : '—'}</span>
+          <span className="live-note">live from the public RPC</span>
+        </div>
         <div className="board-tabs">
           {TABS.map((t) => (
             <button key={t} className={`board-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)} data-anim>
@@ -207,7 +251,7 @@ function Board() {
           {list.map((tok) => (
             <article className="tcard" key={tok.tk} data-anim>
               <div className="tcard-top">
-                <img className="tcard-av" src={`${import.meta.env.BASE_URL}tokens/${tok.tk}.png`} alt={`${tok.nm} logo`} loading="lazy" width={46} height={46} />
+                <img className="tcard-av" src={localLogo(tok.tk)} onError={(e) => logoFallback(e, tok.tk)} alt={`${tok.nm} logo`} loading="lazy" width={46} height={46} />
                 <div>
                   <div className="tcard-nm">{tok.nm}</div>
                   <div className="tcard-tk">${tok.tk}</div>
@@ -324,40 +368,44 @@ function Curve() {
 }
 
 function Bridge() {
+  const openBridge = () => window.open(BRIDGE_URL, '_blank', 'noopener');
   return (
     <section className="section" id="bridge">
       <div className="container" style={{ textAlign: 'center' }}>
         <span className="eyebrow" data-anim><span className="dot" /> The bridge</span>
         <h2 className="h1" style={{ marginTop: 16, maxWidth: '20ch', marginInline: 'auto' }} data-anim>
-          Robinhood L2 ⇄ Solana, in two clicks.
+          Ethereum ⇄ Robinhood Chain, in two clicks.
         </h2>
         <p className="lead" data-anim style={{ maxWidth: '52ch', margin: '18px auto 0' }}>
-          Fund your wallet from wherever your liquidity lives. Move ETH, USDC and
-          USDT across chains with near-zero fees.
+          Robinhood Chain is an Arbitrum L2. Move ETH, USDC and USDT from Ethereum
+          through the canonical bridge and start launching with near-zero gas.
         </p>
 
         <div className="bridge-card" data-anim>
           <div className="bridge-row">
             <div className="bridge-side" style={{ textAlign: 'left' }}>
               <div className="k">From</div>
-              <div className="v">120 USDC</div>
-              <div className="bridge-chain"><Cube width={15} height={15} /> Robinhood EVM L2</div>
+              <div className="v">1.00 ETH</div>
+              <div className="bridge-chain"><Globe width={15} height={15} /> Ethereum</div>
             </div>
-            <div className="bridge-token"><DollarCircle color="#0B0B0C" /></div>
+            <div className="bridge-token"><Globe color="#0B0B0C" /></div>
           </div>
           <div className="bridge-swap"><DataTransferBoth /></div>
           <div className="bridge-row">
             <div className="bridge-side" style={{ textAlign: 'left' }}>
               <div className="k">To</div>
-              <div className="v">119.94 USDC</div>
-              <div className="bridge-chain"><SeaWaves width={15} height={15} /> Solana</div>
+              <div className="v">1.00 ETH</div>
+              <div className="bridge-chain"><Cube width={15} height={15} /> Robinhood Chain</div>
             </div>
-            <div className="bridge-token"><SeaWaves color="#0B0B0C" /></div>
+            <div className="bridge-token"><Cube color="#0B0B0C" /></div>
           </div>
           <div className="bridge-meta">
-            <span>Bridge fee <b>0.05%</b></span>
-            <span>ETA <b>~24s</b></span>
+            <span>Route <b>Canonical (Arbitrum)</b></span>
+            <span>Gas token <b>ETH</b></span>
           </div>
+          <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 22 }} onClick={openBridge}>
+            <OpenNewWindow /> Open the official bridge
+          </button>
           <div className="bridge-assets">
             {ASSETS.map((a) => <span className="pill" key={a}><Coins /> {a}</span>)}
           </div>
@@ -412,7 +460,7 @@ function Features() {
           <div className="bcard third" data-anim>
             <div className="ic"><DataTransferBoth /></div>
             <h3>Cross-chain</h3>
-            <p>Bridge ETH, USDC and USDT between Robinhood L2 and Solana.</p>
+            <p>Bridge ETH, USDC and USDT between Ethereum and Robinhood Chain.</p>
           </div>
           <div className="bcard third" data-anim>
             <div className="ic"><Community /></div>
@@ -451,18 +499,19 @@ function Faq() {
 }
 
 function CTA() {
+  const ui = useUI();
   return (
     <section className="section" style={{ paddingTop: 0 }}>
       <div className="container">
         <div className="cta-box" data-anim>
           <div className="glow" />
           <h2 className="h-mega" style={{ fontSize: 'clamp(40px, 7vw, 92px)' }}>Give it wings.</h2>
-          <p className="lead">Your token is one click from the curve. Launch it on Robinhood Chain and watch it fledge.</p>
+          <p className="lead">Your token is one click from the chain. Launch it on Robinhood Chain and watch it fledge.</p>
           <div className="cta-actions">
-            <button className="btn btn-primary btn-lg"><Rocket /> Launch a token</button>
-            <button className="btn btn-lg" style={{ background: 'transparent', color: 'var(--paper)', border: '1.5px solid rgba(255,255,255,.25)' }}>
+            <button className="btn btn-primary btn-lg" onClick={ui.openCreate}><Rocket /> Launch a token</button>
+            <a className="btn btn-lg" href={DOCS_URL} target="_blank" rel="noopener" style={{ background: 'transparent', color: 'var(--paper)', border: '1.5px solid rgba(255,255,255,.25)' }}>
               <Book /> Read the docs
-            </button>
+            </a>
           </div>
         </div>
       </div>
@@ -484,9 +533,10 @@ function Footer() {
             <Logo />
             <p className="lead">The launchpad on Robinhood Chain. Every launch takes flight.</p>
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              <a className="pill" href="#" aria-label="Twitter"><Twitter /></a>
-              <a className="pill" href="#" aria-label="Discord"><Discord /></a>
-              <a className="pill" href="#" aria-label="Docs"><Book /></a>
+              <a className="pill" href="https://x.com" target="_blank" rel="noopener" aria-label="Twitter"><Twitter /></a>
+              <a className="pill" href="https://discord.com" target="_blank" rel="noopener" aria-label="Discord"><Discord /></a>
+              <a className="pill" href={DOCS_URL} target="_blank" rel="noopener" aria-label="Docs"><Book /></a>
+              <a className="pill" href={EXPLORER} target="_blank" rel="noopener" aria-label="Explorer"><Globe /></a>
             </div>
           </div>
           {cols.map((c) => (
@@ -505,23 +555,40 @@ function Footer() {
   );
 }
 
-export default function App() {
+function AppInner() {
   const scope = useRef(null);
   useReveal(scope);
+  const [modal, setModal] = useState(null); // 'create' | 'portfolio' | null
+  const ui = {
+    openCreate: () => setModal('create'),
+    openPortfolio: () => setModal('portfolio'),
+  };
   return (
-    <div ref={scope}>
-      <Nav />
-      <Hero />
-      <Ticker />
-      <Board />
-      <Steps />
-      <Curve />
-      <Bridge />
-      <Stats />
-      <Features />
-      <Faq />
-      <CTA />
-      <Footer />
-    </div>
+    <UI.Provider value={ui}>
+      <div ref={scope}>
+        <Nav />
+        <Hero />
+        <Ticker />
+        <Board />
+        <Steps />
+        <Curve />
+        <Bridge />
+        <Stats />
+        <Features />
+        <Faq />
+        <CTA />
+        <Footer />
+      </div>
+      {modal === 'create' && <CreateModal onClose={() => setModal(null)} />}
+      {modal === 'portfolio' && <PortfolioModal onClose={() => setModal(null)} />}
+    </UI.Provider>
+  );
+}
+
+export default function App() {
+  return (
+    <WalletProvider>
+      <AppInner />
+    </WalletProvider>
   );
 }

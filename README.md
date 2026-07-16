@@ -7,12 +7,25 @@ Fledge is a landing page for a token launchpad built on **Robinhood Chain**
 **bonding curve** and automatically **graduates to the DEX at 9.9 ETH**, with a
 built-in **bridge between Robinhood EVM L2 and Solana**.
 
-This repo contains the marketing **landing page** (design + copy + motion).
-The app/utility (board, create, bridge, portfolio) is a separate phase.
+## What actually works (on-chain)
+
+- **Connect Wallet** — real injected-wallet connection (viem), adds/switches to
+  Robinhood Chain (chainId **4663**) automatically.
+- **Create** — deploys a **real ERC-20** (`contracts/FledgeToken.sol`, compiled
+  with solc) from the user's wallet on Robinhood Chain; shows the contract on
+  Blockscout. Full supply minted to the deployer.
+- **Portfolio** — real wallet address + ETH balance + tokens you've launched.
+- **Bridge** — opens the official canonical **Ethereum ⇄ Robinhood Chain**
+  bridge (Arbitrum portal).
+- **Live data** — block height + gas price read live from the public RPC.
+
+The bonding-curve board (trade / graduate at 9.9 ETH) is illustrative and is
+the next phase (needs a shared launchpad contract on-chain).
 
 ## Stack
 
 - **Vite + React** (`src/app/`)
+- **viem** — wallet + on-chain reads/writes on Robinhood Chain
 - **GSAP** (ScrollTrigger) — entry animations, element by element, on every section
 - **Iconoir** — line-icon set (deliberately uncommon)
 - Hand-written CSS design system (`src/app/index.css`)
@@ -28,8 +41,8 @@ The app/utility (board, create, bridge, portfolio) is a separate phase.
 ## Sections
 
 Nav · Hero · live ticker · **Board** (New drops / Trending / Migrated / Top
-on-chain) · How it works · **Bonding curve** · **Bridge** (Robinhood L2 ⇄
-Solana) · Stats · Features (bento) · FAQ · CTA · Footer.
+on-chain) · How it works · **Bonding curve** · **Bridge** (Ethereum ⇄
+Robinhood Chain) · Stats · Features (bento) · FAQ · CTA · Footer.
 
 ## Develop
 
